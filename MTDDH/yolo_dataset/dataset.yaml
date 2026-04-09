@@ -1,0 +1,7 @@
+path: /home/angel/Documentos/Universidad/integrador/MTDDH/yolo_dataset
+train: images/train
+val: images/val
+
+kpt_shape: [8, 3] # 8 keypoints, 3 coordinates each (x, y, visible)
+names:
+  0: cadera_pelvis

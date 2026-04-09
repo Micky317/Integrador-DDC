@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.expo/
+dist/
+
+# Large files
+*.zip
+*.tar.gz
+*.rar
+archive.zip
+
+# Models and Large weights
+MTDDH/runs/
+*.pt
+*.weights
+*.h5
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
