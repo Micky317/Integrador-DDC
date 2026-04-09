@@ -69,13 +69,18 @@ async def analyze_radiography(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en inferencia de IA: {str(e)}")
 
-    if not results or results[0].keypoints is None:
+    kpts = getattr(results[0], 'keypoints', None)
+    if kpts is None or not hasattr(kpts, 'xy'):
         raise HTTPException(status_code=422, detail="No se detectaron estructuras anatómicas en la imagen")
 
-    puntos = results[0].keypoints.xy[0].cpu().numpy()
-
-    if len(puntos) < 6:
-        raise HTTPException(status_code=422, detail="Puntos insuficientes detectados. Verifique la calidad de la radiografía.")
+    try:
+        if len(kpts.xy) == 0 or kpts.xy.shape[0] == 0 or kpts.xy.shape[1] == 0:
+            raise HTTPException(status_code=422, detail="Puntos insuficientes")
+        puntos = kpts.xy[0].cpu().numpy()
+        if len(puntos) < 6:
+            raise HTTPException(status_code=422, detail="Puntos insuficientes detectados. Verifique la calidad de la radiografía.")
+    except Exception:
+        raise HTTPException(status_code=422, detail="No se detectaron estructuras anatómicas en la imagen")
 
     # Mapear los puntos para enviarlos al Frontend
     claves: list[KeyPoint] = []
