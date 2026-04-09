@@ -19,6 +19,7 @@ Este documento es la guía maestra para llevar el proyecto de un prototipo a un 
 - [x] Gráfica de evolución profesional (Gifted Charts).
 - [x] Sistema de Historial clínico persistente.
 - [x] Auditoría de "Bloques de prueba" eliminada.
+- [x] "Análisis Rápido" (Quick Scan) con conversión a expediente.
 
 ## 📄 Fase 7: Reportes Médicos y Exportación PDF (PRÓXIMAMENTE)
 - [ ] Plantilla de PDF con escudo institucional y datos médicos.

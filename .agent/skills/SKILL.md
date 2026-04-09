@@ -286,6 +286,9 @@ EXPO_PUBLIC_API_URL=http://192.168.x.x:8000
   - EvolucionScreen (gráfica de curva de ángulos con gifted-charts)
   - historial.service.ts y pacientes.service.ts (CRUD completo)
   - Persistencia real de imágenes anotadas en Supabase Storage
+  - Función de Análisis Rápido (Quick Scan) con Hero Card premium ✅
+    - Flujo efímero de análisis sin registro previo
+    - Conversión de análisis rápido a expediente formal
 - [ ] FASE 7: Reportes Médicos y Exportación PDF
   - Generación de informe clínico con imagen anotada y diagnóstico
   - Compartir reporte vía WhatsApp/Correo
