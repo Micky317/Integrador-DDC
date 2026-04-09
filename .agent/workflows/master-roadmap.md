@@ -2,43 +2,36 @@
 
 Este documento es la guía maestra para llevar el proyecto de un prototipo a un producto médico final de alta calidad.
 
-## ✅ Fase 1: Arquitectura Modular (Completado)
+## ✅ Fase 1 al 4: Cimientos e Integración (Completado)
 - [x] Backend desacoplado (IA/Core/API).
-- [x] Frontend feature-based.
-- [x] Tipado y utilidades centralizadas.
+- [x] Frontend feature-based con TanStack Query y Zustand.
+- [x] CRUD real de Pacientes y Auth con Supabase.
+- [x] Persistencia de Imágenes Anotadas en Storage.
 
-## ✅ Fase 2: Estado y Datos (Completado)
-- [x] TanStack Query para caché de servidor.
-- [x] Zustand para estado de sesión.
+## ✅ Fase 5: Estética Premium UI/UX (Completado)
+- [x] Glassmorphism general con Blur View.
+- [x] Sistema de Toasts nativos con Zustand.
+- [x] Skeletons y estados de carga refinados.
+- [x] Tipografía Inter y escalado responsivo.
 
-## ✅ Fase 4: Integración Supabase (Completado)
-- [x] Login/Registro de Doctores con Secure Storage.
-- [x] CRUD real de Pacientes con Optimistic Updates.
-- [x] Almacenamiento Estructurado en Storage (Carpetas privadas).
-- [x] Resiliencia de red con reintentos automáticos.
+## ✅ Fase 6: Gestión y Evolución de Pacientes (Completado)
+- [x] Perfil detallado del paciente (PacienteDetalleScreen).
+- [x] Gráfica de evolución profesional (Gifted Charts).
+- [x] Sistema de Historial clínico persistente.
+- [x] Auditoría de "Bloques de prueba" eliminada.
 
-## ✨ Fase 5: Estética Premium UI/UX
-- [ ] Glassmorphism en tarjetas y modales.
-- [ ] Skeletons de carga y estados de Shimmer.
-- [ ] Animaciones de transición fluida (Moti/Reanimated).
-- [ ] Modo oscuro/claro consistente.
+## 📄 Fase 7: Reportes Médicos y Exportación PDF (PRÓXIMAMENTE)
+- [ ] Plantilla de PDF con escudo institucional y datos médicos.
+- [ ] Inclusión de imagen anotada y diagnóstico en el reporte.
+- [ ] Función "Compartir Reporte" vía redes sociales/correo.
 
-## 👶 Fase 6: Gestión y Evolución de Pacientes
-- [ ] Perfil detallado del paciente.
-- [ ] Gráfico de historial de ángulos (Evolución de displasia).
-- [ ] Edición de antecedentes y notas médicas.
+## 🏠 Fase 8: Portal de Familia y Seguimiento de Tratamiento (PRÓXIMAMENTE)
+- [ ] Dashboard del Padre (Vista restringida a sus hijos).
+- [ ] Guías de Ejercicios Multimedia para rehabilitación.
+- [ ] Sistema de Recordatorios de Citas y Controles.
 
-## 📸 Fase 7: Captura y Procesamiento de Imagen
-- [ ] Cámara con overlay de guía (Encuadre RX).
-- [ ] Editor de recorte (Crop) antes del envío.
-- [ ] Validación de resolución y brillo mínima.
-
-## 📄 Fase 8: Reportes y Compartir
-- [ ] Plantilla de PDF con escudo de la universidad y datos médicos.
-- [ ] Inclusión de imagen anotada en el reporte.
-- [ ] Botón de "Compartir Reporte" nativo.
-
-## 🚀 Fase 9: Validación y Entrega Final
-- [ ] Análisis de precisión médicos vs IA.
-- [ ] Documentación técnica completa.
-- [ ] Demo final de presentación.
+## 🔗 Fase 9: Vinculación y Validación Final (ENTREGA)
+- [ ] Sistema de Vinculación Médico-Padre (QR Scan).
+- [ ] Notificaciones Push para seguimiento.
+- [ ] Test de precisión: Médico Humano vs IA.
+- [ ] Demo final y documentación técnica.

@@ -283,9 +283,18 @@ EXPO_PUBLIC_API_URL=http://192.168.x.x:8000
 - [x] FASE 5: Pantallas de Auth — Login, Registro Doctor, Registro Padre con Social Auth UI ✅
 - [x] FASE 6: Gestión y Evolución de Pacientes ✅
   - PacienteDetalleScreen (perfil, antecedentes, tutor, historial de análisis)
-  - EvolucionScreen (gráfica de curva de ángulos, tendencia global, resumen)
-  - historial.service.ts (getHistorialByPaciente, getAnalisisById, updateNotas)
-  - pacientes.service.ts refactorizado (DRY, getPacienteById, deletePaciente)
-  - AnalisisHistorialCard componente premium
-  - usePacienteDetalle hook (TanStack Query + eliminación con Zustand toast)
+  - EvolucionScreen (gráfica de curva de ángulos con gifted-charts)
+  - historial.service.ts y pacientes.service.ts (CRUD completo)
+  - Persistencia real de imágenes anotadas en Supabase Storage
+- [ ] FASE 7: Reportes Médicos y Exportación PDF
+  - Generación de informe clínico con imagen anotada y diagnóstico
+  - Compartir reporte vía WhatsApp/Correo
+- [ ] FASE 8: Portal de Familia y Seguimiento de Tratamiento
+  - Dashboard del Padre (vista filtrada de su bebé)
+  - Guías Multimedia de Ejercicios de Rehabilitación
+  - Sistema de Recordatorios de Citas
+- [ ] FASE 9: Notificaciones y Vinculación Final
+  - Push Notifications a través de Expo Notifications
+  - Escaneo de QR para vincular Padre con Paciente
+  - Validación de Matrícula Médica (Admin Flow)
 
