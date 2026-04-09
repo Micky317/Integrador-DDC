@@ -278,3 +278,4 @@ EXPO_PUBLIC_API_URL=http://192.168.x.x:8000
 - [x] Refactorización a Arquitectura Modular (Backend) ✅
 - [x] Refactorización a Arquitectura de Features (Frontend) ✅
 - [x] Implementación de TanStack Query y Zustand ✅
+- [ ] Conexión a Supabase (Auth & Pacientes) ⏳

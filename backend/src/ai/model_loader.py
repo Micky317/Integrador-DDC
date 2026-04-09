@@ -14,10 +14,10 @@ def load_yolo_model():
     print(f"Cargando modelo desde: {MODEL_PATH}")
     try:
         model = YOLO(MODEL_PATH)
-        print("✅ Modelo YOLOv8 Pose cargado exitosamente.")
+        print("Modelo YOLOv8 Pose cargado exitosamente.")
         return model
     except Exception as e:
-        print(f"❌ Error al cargar modelo: {e}")
+        print(f"Error al cargar modelo: {e}")
         return None
 
 # Instancia global del modelo para todo el backend
