@@ -11,11 +11,11 @@ Este documento es la guía maestra para llevar el proyecto de un prototipo a un 
 - [x] TanStack Query para caché de servidor.
 - [x] Zustand para estado de sesión.
 
-## 💾 Fase 4: Integración Supabase (En progreso)
-- [ ] Login/Registro de Doctores (Auth).
-- [ ] CRUD real de Pacientes (PostgreSQL).
-- [ ] Almacenamiento de RX en Supabase Storage.
-- [ ] Persistencia de análisis en la nube.
+## ✅ Fase 4: Integración Supabase (Completado)
+- [x] Login/Registro de Doctores con Secure Storage.
+- [x] CRUD real de Pacientes con Optimistic Updates.
+- [x] Almacenamiento Estructurado en Storage (Carpetas privadas).
+- [x] Resiliencia de red con reintentos automáticos.
 
 ## ✨ Fase 5: Estética Premium UI/UX
 - [ ] Glassmorphism en tarjetas y modales.
