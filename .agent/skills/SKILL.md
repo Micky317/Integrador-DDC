@@ -43,15 +43,15 @@ Sistema integral de diagnóstico, seguimiento y rehabilitación para la **Displa
 
 ---
 
-## Stack Tecnológico DEFINITIVO
-
 | Capa | Tecnología | Razón |
 |---|---|---|
 | Modelo de IA | YOLOv8n-pose (Ultralytics) | Entrenado. 99.1% mAP50-95, 8 keypoints DDH |
 | API de IA | **FastAPI** (Python) | Recibe imagen JPG → devuelve JSON con ángulos y diagnóstico |
 | Base de datos | **Supabase** (PostgreSQL) | Auth, Storage de radiografías, historial clínico, RLS |
 | App Móvil | **Expo** (React Native + TypeScript) | Universal: iOS, Android y Web desde un solo codebase |
-| Lenguaje frontend | **TypeScript** (nunca JavaScript puro) | Tipado estricto crítico para aplicaciones de salud |
+| Estado Global | **Zustand** | Manejo de estado ultra-ligero y rápido |
+| Data Fetching | **TanStack Query (v5)** | Caché inteligente, reintentos automáticos y performance |
+| Lenguaje | **TypeScript** | Tipado estricto crítico para aplicaciones de salud |
 
 ---
 
@@ -120,19 +120,132 @@ def calculate_acetabular_angle(p_techo, p_cartilago):
 
 ---
 
-## Convenciones de Código
+## Estándares de Arquitectura (SENIOR REFAC)
 
-### Backend (FastAPI / Python)
-- Usar `snake_case` para variables y funciones
-- Todos los endpoints deben retornar `{"status": "ok"|"error", "data": {...}}`  
-- El endpoint principal de análisis es `POST /analyze`
-- Cargar el modelo YOLO una sola vez al iniciar el servidor (no en cada request)
+### 🐍 Backend (Modular Domain Logic)
+Para escalabilidad, el backend se organiza en módulos:
+- `api/`: Definición de rutas (FastAPI). No contiene lógica de IA.
+- `core/`: Lógica de negocio (Cálculos de ángulos de Graf, diagnósticos).
+- `ai/`: Gestión del modelo YOLO (Carga e inferencia).
+- `utils/`: Procesamiento de imágenes con OpenCV.
+- `schemas/`: Modelos Pydantic para peticiones/respuestas.
 
-### Frontend (Expo / TypeScript)
-- Usar `camelCase` para variables, `PascalCase` para componentes
-- Nunca usar `any` como tipo en TypeScript
-- Carpeta `src/` con estructura: `screens/`, `components/`, `services/`, `types/`
-- El cliente de Supabase se inicializa en `src/lib/supabase.ts`
+### ⚛️ Frontend (Feature-Based Architecture)
+Para evitar archivos gigantes y facilitar el mantenimiento:
+- `app/`: Routing puro (Expo Router).
+- `src/features/[feature_name]/`: Lógica pesada, sub-componentes y hooks específicos.
+- `src/components/`: UI Atómica (Botones, Inputs, Cards genéricos).
+- `src/hooks/`: Hooks globales y de datos (TanStack Query).
+- `src/services/`: Clientes de API y Supabase.
+- `src/store/`: Estado global con Zustand.
+
+---
+
+## 🎩 Protocolo de Desarrollo SENIOR
+
+Como desarrollador experto en este proyecto, mis reglas de oro son:
+
+1.  **Preguntar antes de Actuar:** Si una instrucción es ambigua o falta contexto técnico/médico, debo **detenerme y preguntar** antes de generar código.
+2.  **Manejo de Errores Robusto:** Todo código nuevo o refactorizado **debe** incluir bloques de control de errores (try/catch) y feedback claro para el usuario.
+3.  **Código Limpio (DRY & Legible):** Prohibida la lógica duplicada. Usar nombres de variables descriptivos en inglés o español técnico (ej: `currentPatient` en lugar de `p`).
+4.  **Explicación de Cambios:** Cada refactorización o cambio importante debe venir acompañado de una explicación de la decisión técnica tomada.
+5.  **Mantenibilidad:** El código debe estar estructurado para que sea fácil de entender y mejorar en el futuro.
+
+---
+
+## 📊 Diccionario de Datos y Tipos (Interfaces)
+
+Para mantener la consistencia, estas son las estructuras base:
+
+### `Paciente`
+```typescript
+interface Paciente {
+  id: string;          // UUID de Supabase
+  nombre: string;
+  apellido: string;
+  fecha_nacimiento: string;
+  genero: 'M' | 'F';
+  tutor_id: string;    // Relación con tabla perfiles
+  created_at: string;
+}
+```
+
+### `Analisis`
+```typescript
+interface Analisis {
+  id: string;
+  paciente_id: string;
+  angulo_izq: number;
+  angulo_der: number;
+  dx_izq: 'NORMAL' | 'LIMITROFE' | 'DISPLASIA';
+  dx_der: 'NORMAL' | 'LIMITROFE' | 'DISPLASIA';
+  imagen_url: string;  // Path en Supabase Storage
+  puntos_clave: KeyPoint[]; 
+  fecha: string;
+}
+```
+
+---
+
+## 🎨 Sistema de Diseño y UI
+
+Mantener siempre estos tokens visuales:
+- **Color Primario:** `#00E5CC` (Cyan Médico)
+- **Fondo:** `#090D1F` (Dark Deep Blue)
+- **Status Colors:** Verde (`#00C48C`), Amarillo (`#FFB400`), Rojo (`#FF4757`).
+- **Layout:** Los componentes de pantalla no deben exceder las **200 líneas**. Extraer lógica a Hooks y UI a sub-componentes.
+
+---
+
+---
+
+## 🛠️ Protocolo de Manejo de Errores
+
+1.  **Error de IA:** Si `POST /analyze` falla, mostrar un Alert informando que es un "Error de conexión con el Servidor Médico" y permitir que el usuario intente de nuevo o use el ajuste manual.
+2.  **Error de Red:** Usar los reintentos automáticos de **TanStack Query**.
+3.  **Feedback Visual:** Nunca dejar la pantalla vacía; usar Skeletons o ActivityIndicators de la marca.
+
+---
+
+## 📡 Contrato de API (Endpoints Actuales)
+
+| Endpoint | Método | Cuerpo (FormData) | Respuesta (JSON) |
+|---|---|---|---|
+| `/analyze` | `POST` | `file`: Imagen RX | `AnalisisApiResponse` |
+| `/recalculate` | `POST` | `file`: Imagen RX, `puntos_json`: string | `AnalisisApiResponse` |
+
+**`AnalisisApiResponse` Structure:**
+```json
+{
+  "angulo_izquierda": 0.0,
+  "angulo_derecha": 0.0,
+  "diagnostico_izquierda": "NORMAL|LIMITROFE|DISPLASIA",
+  "diagnostico_derecha": "NORMAL|LIMITROFE|DISPLASIA",
+  "imagen_anotada_base64": "string...",
+  "puntos_clave": [{"id": 0, "label": "string", "x": 0, "y": 0}]
+}
+```
+
+---
+
+## 💾 Esquema de Base de Datos (Supabase)
+
+### Tabla `pacientes`
+- `id`: UUID (Primary Key)
+- `nombre_completo`: Text
+- `codigo_paciente`: Text (ej: P-1234)
+- `fecha_nacimiento`: Date
+- `sexo`: 'M' | 'F'
+- `doctor_id`: UUID (FK perfiles)
+
+### Tabla `analisis`
+- `id`: UUID (Primary Key)
+- `paciente_id`: UUID (FK pacientes)
+- `angulo_izq`: Float
+- `angulo_der`: Float
+- `puntos_json`: JSONB (Coordenadas de los 8 puntos)
+- `imagen_url`: Text (Storage path)
+- `created_at`: Timestamp
 
 ---
 
@@ -154,11 +267,12 @@ EXPO_PUBLIC_API_URL=http://192.168.x.x:8000
 
 ---
 
-## Estado Actual del Proyecto (Actualizar con cada sesión)
-
 - [x] Dataset preparado (COCO Keypoints → YOLO format)
 - [x] Modelo YOLOv8n-pose entrenado (100 epochs, 99.1% mAP50-95)
 - [x] Demo Gradio funcional con filtros de trazado médico
-- [x] FastAPI backend ✅
+- [x] FastAPI backend (Monolito inicial) ✅
 - [x] Supabase: tablas y roles ✅
-- [ ] App Expo: pantallas de login, médico, padre
+- [x] Ajuste manual de puntos con Zoom y Precisión ✅
+- [ ] Refactorización a Arquitectura Modular (Backend) ⏳
+- [ ] Refactorización a Arquitectura de Features (Frontend) ⏳
+- [ ] Implementación de TanStack Query y Zustand ⏳
