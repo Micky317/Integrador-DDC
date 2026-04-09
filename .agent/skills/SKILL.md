@@ -273,6 +273,6 @@ EXPO_PUBLIC_API_URL=http://192.168.x.x:8000
 - [x] FastAPI backend (Monolito inicial) ✅
 - [x] Supabase: tablas y roles ✅
 - [x] Ajuste manual de puntos con Zoom y Precisión ✅
-- [ ] Refactorización a Arquitectura Modular (Backend) ⏳
-- [ ] Refactorización a Arquitectura de Features (Frontend) ⏳
-- [ ] Implementación de TanStack Query y Zustand ⏳
+- [x] Refactorización a Arquitectura Modular (Backend) ✅
+- [x] Refactorización a Arquitectura de Features (Frontend) ✅
+- [x] Implementación de TanStack Query y Zustand ✅
