@@ -279,3 +279,13 @@ EXPO_PUBLIC_API_URL=http://192.168.x.x:8000
 - [x] Refactorización a Arquitectura de Features (Frontend) ✅
 - [x] Implementación de TanStack Query y Zustand ✅
 - [x] Conexión a Supabase (Auth, Pacientes y Storage) ✅
+- [x] FASE 5: UI/UX Premium — Glassmorphism, Inter Font, Lottie, Toasts, Responsive ✅
+- [x] FASE 5: Pantallas de Auth — Login, Registro Doctor, Registro Padre con Social Auth UI ✅
+- [x] FASE 6: Gestión y Evolución de Pacientes ✅
+  - PacienteDetalleScreen (perfil, antecedentes, tutor, historial de análisis)
+  - EvolucionScreen (gráfica de curva de ángulos, tendencia global, resumen)
+  - historial.service.ts (getHistorialByPaciente, getAnalisisById, updateNotas)
+  - pacientes.service.ts refactorizado (DRY, getPacienteById, deletePaciente)
+  - AnalisisHistorialCard componente premium
+  - usePacienteDetalle hook (TanStack Query + eliminación con Zustand toast)
+
