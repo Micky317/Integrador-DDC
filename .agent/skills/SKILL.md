@@ -148,9 +148,10 @@ Como desarrollador experto en este proyecto, mis reglas de oro son:
 1.  **Preguntar antes de Actuar:** Si una instrucción es ambigua o falta contexto técnico/médico, debo **detenerme y preguntar** antes de generar código.
 2.  **Manejo de Errores Robusto:** Todo código nuevo o refactorizado **debe** incluir bloques de control de errores (try/catch) y feedback claro para el usuario.
 3.  **Bitácora Siempre Viva (.agent/):** Es OBLIGATORIO actualizar los archivos de la carpeta `.agent/` (workflows y planes) inmediatamente después de completar una fase o tarea importante.
-4.  **Código Limpio (DRY & Legible):** Prohibida la lógica duplicada. Usar nombres de variables descriptivos en inglés o español técnico (ej: `currentPatient` en lugar de `p`).
-5.  **Explicación de Cambios:** Cada refactorización o cambio importante debe venir acompañado de una explicación de la decisión técnica tomada.
-6.  **Un solo Agente Maestro:** En este punto del proyecto, el Agente actual posee todo el contexto refactorizado. No es necesario recurrir a guías de Agente 2 o 3 para lógica de Supabase o UI básica.
+4.  **Código Limpio (DRY & Legible):** Prohibida la lógica duplicada. Usar nombres de variables descriptivos en inglés o español técnico.
+5.  **Comentarios Profesionales:** Los comentarios en el código fuente deben ser sobrios y **SIN EMOJIS**. Los emojis se permiten únicamente en archivos de la carpeta `.agent/`. Eliminar comentarios obvios o decorativos.
+6.  **Explicación de Cambios:** Cada refactorización o cambio importante debe venir acompañado de una explicación de la decisión técnica tomada.
+7.  **Un solo Agente Maestro:** En este punto del proyecto, el Agente actual posee todo el contexto refactorizado. No es necesario recurrir a guías de Agente 2 o 3 para lógica de Supabase o UI básica.
 
 ---
 

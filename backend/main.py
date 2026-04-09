@@ -14,16 +14,14 @@ from src.utils.drawing import annotate_image, image_to_base64
 
 load_dotenv()
 
-# ============================================================
-# INICIALIZACIÓN DEL SERVIDOR
-# ============================================================
+# Inicializacion del servidor
 app = FastAPI(
-    title="DDC Pasitos Firmes — API de Análisis IA",
-    description="Backend FastAPI modularizado para el cálculo de ángulos acetabulares.",
-    version="2.0.0" # Bumped version for refactor
+    title="DDC Pasitos Firmes - API de Analisis IA",
+    description="Backend FastAPI modularizado para el calculo de angulos acetabulares.",
+    version="2.0.0"
 )
 
-# CORS abierto para permitir peticiones desde la app Expo y web
+# CORS configurado para la app Expo y navegadores web
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,12 +30,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================================================
-# ENDPOINTS
-# ============================================================
+# Endpoints
 @app.get("/", response_model=HealthCheck)
 async def health_check():
-    """Verifica que el servidor y el modelo estén activos."""
+    """Verifica el estado del servidor y la carga del modelo."""
     return HealthCheck(
         status="ok",
         modelo_cargado=model_instance is not None,
