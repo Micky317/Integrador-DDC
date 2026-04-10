@@ -155,3 +155,8 @@ async def recalculate_radiography(
         imagen_anotada_base64=image_to_base64(img_anotada),
         puntos_clave=claves
     )
+
+if __name__ == "__main__":
+    import uvicorn
+    # Importante: 0.0.0.0 para que sea visible desde el iPhone XR
+    uvicorn.run(app, host="0.0.0.0", port=8000)
