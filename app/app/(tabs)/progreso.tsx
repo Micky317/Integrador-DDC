@@ -66,7 +66,7 @@ export default function MisBebesScreen() {
 
     // Lógica de color consistente con las tarjetas del médico
     const avatarColor = Colors.avatarVariants[Math.abs(bebe.id.charCodeAt(0)) % Colors.avatarVariants.length];
-    
+
     return (
       <View style={styles.heroContainer}>
         <GlassContainer style={styles.heroCard}>
@@ -78,7 +78,7 @@ export default function MisBebesScreen() {
               <Text style={styles.heroName}>{nombre}</Text>
               <Text style={styles.heroStatus}>En tratamiento activo</Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.heroBadge}
               onPress={() => router.push({ pathname: '/(tabs)/paciente-detalle', params: { id: bebe.id } })}
             >
@@ -98,10 +98,13 @@ export default function MisBebesScreen() {
             </View>
           </View>
 
-          <PrimaryButton 
-            title="Iniciar Rehabilitación" 
+          <PrimaryButton
+            title="Iniciar Rehabilitación"
             icon="play-circle"
-            onPress={() => router.push('/(tabs)/rehabilitacion')}
+            onPress={() => {
+              console.log('[Progreso] Navegando a rehab con bebe.id:', bebe.id);
+              router.push({ pathname: '/(tabs)/rehabilitacion', params: { id: bebe.id } });
+            }}
             style={styles.heroActionBtn}
           />
         </GlassContainer>
@@ -112,14 +115,14 @@ export default function MisBebesScreen() {
   return (
     <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
       <StatusBar style="light" />
-      
+
       <View style={styles.header}>
         <View>
-          <Text style={styles.welcomeText}>Hola, {user?.nombre?.split(' ')[0] || 'Padre'}</Text>
+          <Text style={styles.welcomeText}>Hola, {user?.name?.split(' ')[0] || 'Padre'}</Text>
           <Text style={styles.title}>Panel de Control</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.addBtn} 
+        <TouchableOpacity
+          style={styles.addBtn}
           onPress={() => setShowModal(true)}
           activeOpacity={0.8}
         >
@@ -141,7 +144,7 @@ export default function MisBebesScreen() {
               <View style={styles.listSection}>
                 <Text style={styles.sectionTitle}>Tus Bebés</Text>
                 {misBebes.map((bebe) => (
-                  <PacienteCard 
+                  <PacienteCard
                     key={bebe.id}
                     paciente={bebe}
                     onPress={() => router.push({ pathname: '/(tabs)/paciente-detalle', params: { id: bebe.id } })}
@@ -151,7 +154,7 @@ export default function MisBebesScreen() {
             )}
 
             {renderEducationalCards()}
-            
+
             <View style={styles.extraMargin} />
           </>
         ) : (
@@ -164,10 +167,10 @@ export default function MisBebesScreen() {
               <Text style={styles.emptySub}>
                 Aquí centralizarás todo el seguimiento médico y ejercicios de tus hijos. Comienza vinculando a tu primer bebé.
               </Text>
-              <PrimaryButton 
-                title="Vincular con Código" 
+              <PrimaryButton
+                title="Vincular con Código"
                 icon="link-outline"
-                onPress={() => setShowModal(true)} 
+                onPress={() => setShowModal(true)}
                 style={{ width: '100%', marginTop: Spacing.xl }}
               />
             </GlassContainer>
@@ -182,11 +185,11 @@ export default function MisBebesScreen() {
             <TouchableOpacity style={styles.closeBtn} onPress={handleCloseModal}>
               <Ionicons name="close" size={24} color={Colors.textMuted} />
             </TouchableOpacity>
-            
+
             <Ionicons name="link" size={40} color={Colors.primary} style={{ marginBottom: 16 }} />
             <Text style={styles.modalTitle}>Vincular Bebé</Text>
             <Text style={styles.modalDesc}>El médico te proporcionó un código único para cada paciente.</Text>
-            
+
             <TextInput
               style={styles.input}
               placeholder="DDC-A1B2"
@@ -197,9 +200,9 @@ export default function MisBebesScreen() {
               maxLength={10}
             />
 
-            <PrimaryButton 
-              title="Confirmar Vínculo" 
-              onPress={handleVincular} 
+            <PrimaryButton
+              title="Confirmar Vínculo"
+              onPress={handleVincular}
               loading={isLinking}
               disabled={!codigo || isLinking}
               style={{ width: '100%' }}
@@ -214,38 +217,38 @@ export default function MisBebesScreen() {
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingHorizontal: Spacing.xl, 
-    paddingTop: 70, 
-    paddingBottom: Spacing.md 
+    paddingHorizontal: Spacing.xl,
+    paddingTop: 70,
+    paddingBottom: Spacing.md
   },
   welcomeText: { color: Colors.textSecondary, fontSize: Typography.size.base },
   title: { color: Colors.textPrimary, fontSize: Typography.size.xxl, fontWeight: Typography.weight.bold },
-  addBtn: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
-    backgroundColor: Colors.primary, 
-    alignItems: 'center', 
+  addBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
     justifyContent: 'center',
-    ...Shadow.glow 
+    ...Shadow.glow
   },
   scroll: { paddingHorizontal: Spacing.lg, paddingBottom: 100, paddingTop: Spacing.md },
   center: { marginTop: 100, alignItems: 'center' },
-  
+
   // Hero Styles
   heroContainer: { marginBottom: Spacing.xl },
   heroCard: { padding: Spacing.lg },
   heroHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xl },
-  heroAvatar: { 
-    width: 60, 
-    height: 60, 
-    borderRadius: 30, 
-    backgroundColor: Colors.accentGlow || 'rgba(77, 110, 227, 0.2)', 
-    alignItems: 'center', 
+  heroAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.accentDim,
+    alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
     borderWidth: 2,
@@ -255,7 +258,7 @@ const styles = StyleSheet.create({
   heroName: { color: Colors.textPrimary, fontSize: Typography.size.lg, fontWeight: Typography.weight.bold },
   heroStatus: { color: Colors.textSecondary, fontSize: Typography.size.sm },
   heroBadge: { marginLeft: 'auto', padding: 8 },
-  
+
   heroStatsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.xl },
   statItem: { flex: 1, alignItems: 'center' },
   statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.1)' },
@@ -266,7 +269,7 @@ const styles = StyleSheet.create({
   // List Section
   listSection: { marginBottom: Spacing.xl },
   sectionTitle: { color: Colors.textPrimary, fontSize: Typography.size.lg, fontWeight: Typography.weight.bold, marginBottom: Spacing.md, paddingLeft: 4 },
-  
+
   // Educational Section
   eduSection: { marginBottom: Spacing.xl },
   eduScroll: { paddingRight: Spacing.xl },
@@ -289,15 +292,15 @@ const styles = StyleSheet.create({
   modalTitle: { color: Colors.textPrimary, fontSize: Typography.size.lg, fontWeight: Typography.weight.bold, marginBottom: 8 },
   modalDesc: { color: Colors.textSecondary, fontSize: Typography.size.sm, textAlign: 'center', marginBottom: 24, lineHeight: 18 },
   closeBtn: { position: 'absolute', top: 16, right: 16 },
-  input: { 
-    width: '100%', 
-    height: 60, 
-    backgroundColor: Colors.bgCardLight, 
-    borderRadius: Radius.md, 
-    borderWidth: 1.5, 
-    borderColor: Colors.borderDefault, 
-    color: Colors.textPrimary, 
-    fontSize: Typography.size.xl, 
+  input: {
+    width: '100%',
+    height: 60,
+    backgroundColor: Colors.bgCardLight,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.borderDefault,
+    color: Colors.textPrimary,
+    fontSize: Typography.size.xl,
     textAlign: 'center',
     fontWeight: 'bold',
     letterSpacing: 2,

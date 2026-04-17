@@ -30,7 +30,11 @@ export default function TabsLayout() {
   const { user } = useAppStore();
 
   if (!user) {
-    return <View />;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0D1225', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
   }
 
   const isMedico = user.role === 'medico';

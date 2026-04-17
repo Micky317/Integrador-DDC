@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, ViewStyle, DimensionValue } from 'react-native';
+import { Animated, StyleSheet, ViewStyle, DimensionValue, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Radius } from '../constants/theme';
 
 interface SkeletonProps {
   width?: DimensionValue;
   height?: DimensionValue;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   borderRadius?: number;
 }
 
