@@ -12,6 +12,19 @@ import { useRehabilitacion } from '../features/rehabilitacion/hooks/useRehabilit
 import { Ejercicio, CATALOGO_EJERCICIOS } from '../constants/ejercicios';
 import { Prescripcion } from '../services/rehabilitacion.service';
 
+// Componente de Animación Memorizado para evitar parpadeos por el timer
+const EjercicioAnimacion = React.memo(({ ex }: { ex: Ejercicio }) => {
+  if (!ex.id?.includes('ranita') && !ex.videoLocal) return null;
+  
+  return (
+    <Image 
+      source={ex.id?.includes('ranita') ? require('../../assets/animations/rehab_anim.gif') : ex.videoLocal} 
+      style={{ width: '100%', height: '100%', borderRadius: 16 }}
+      resizeMode="cover"
+    />
+  );
+});
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
@@ -77,6 +90,14 @@ export default function RehabilitacionScreen() {
   const [timeLeft, setTimeLeft] = useState(0); 
   const [isFinished, setIsFinished] = useState(false);
 
+  // Memorizar el ejercicio para evitar re-renders infinitos
+  // SIEMPRE arriba de cualquier return temprano
+  const ex = React.useMemo(() => {
+    if (!activeExercise) return null;
+    const catalogoInfo = CATALOGO_EJERCICIOS.find(e => e.id === activeExercise.ejercicio_id);
+    return { ...catalogoInfo, ...activeExercise.ejercicio } as Ejercicio;
+  }, [activeExercise?.id, activeExercise?.ejercicio_id]);
+
   // Lógica del temporizador
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -129,11 +150,7 @@ export default function RehabilitacionScreen() {
   }
 
   // Vista de Reproductor de Ejercicio
-  if (activeExercise) {
-    // Buscar datos frescos del catálogo por si el cache de la DB falló
-    const catalogoInfo = CATALOGO_EJERCICIOS.find(e => e.id === activeExercise.ejercicio_id);
-    const ex = { ...catalogoInfo, ...activeExercise.ejercicio } as Ejercicio;
-    
+  if (activeExercise && ex) {
     return (
       <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
         <StatusBar style="light" />
@@ -146,20 +163,15 @@ export default function RehabilitacionScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <GlassContainer intensity={30} style={styles.videoCard}>
-            {ex.videoLocal || ex.id === 'abduccion-ranita' ? (
-              <Image 
-                source={ex.videoLocal || require('../../assets/animations/rehab_anim.gif')} 
-                style={styles.videoStyle}
-                resizeMode="cover"
-              />
-            ) : (
+          <View style={[styles.videoCard, { backgroundColor: 'transparent', borderColor: ex.color + '30', borderWidth: 1 }]}>
+            <EjercicioAnimacion ex={ex} />
+            {(!ex.id?.includes('ranita') && !ex.videoLocal) && (
               <View style={styles.fallbackMedia}>
                 <Ionicons name={ex.icon} size={80} color={ex.color} />
                 <Text style={styles.videoText}>{ex.subtitulo}</Text>
               </View>
             )}
-          </GlassContainer>
+          </View>
 
           <View style={styles.timerContainer}>
             <View style={[styles.timerCircle, { borderColor: ex.color + '20', borderTopColor: ex.color }]}>
