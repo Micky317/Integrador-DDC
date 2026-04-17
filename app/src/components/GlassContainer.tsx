@@ -2,7 +2,7 @@ import React, { ReactNode } from 'react';
 import { StyleSheet, ViewStyle, View, StyleProp, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Radius, Shadow } from '../constants/theme';
+import { Radius } from '../constants/theme';
 
 interface GlassContainerProps {
   children: ReactNode;
@@ -13,55 +13,60 @@ interface GlassContainerProps {
 export function GlassContainer({ children, style, intensity = 25 }: GlassContainerProps) {
   const isAndroid = Platform.OS === 'android';
 
-  return (
-    <View style={[
-      styles.wrapper, 
-      { backgroundColor: isAndroid ? 'rgba(20, 24, 48, 0.85)' : 'rgba(20, 24, 48, 0.45)' },
-      style
-    ]}>
-      {/* Capa de fondo base (Gradiante sutil para profundidad) */}
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* El BlurView (Solo para iOS realmente) */}
-      {!isAndroid && (
-        <BlurView 
-          intensity={intensity} 
-          tint="dark" 
-          style={StyleSheet.absoluteFill} 
+  if (isAndroid) {
+    return (
+      <View style={[styles.androidWrapper, style]}>
+        {/* Fondo base oscuro */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(13, 18, 37, 0.92)' }]} />
+        
+        {/* Gradiente de profundidad (Efecto Glassmorphism para Android) */}
+        <LinearGradient
+          colors={['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.03)', 'rgba(255, 255, 255, 0)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
         />
-      )}
-      
-      {/* Capa de brillo superior (Solo para dar sensación de cristal) */}
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.12)', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.2, y: 0.5 }}
-        style={StyleSheet.absoluteFill}
-      />
-      
-      {/* Contenido */}
+        
+        <View style={styles.content}>
+          {children}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <BlurView 
+      intensity={intensity} 
+      tint="dark" 
+      style={[styles.iosWrapper, style]}
+    >
       <View style={styles.content}>
         {children}
       </View>
-    </View>
+    </BlurView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
+  iosWrapper: {
     borderRadius: Radius.xl,
     overflow: 'hidden',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1,
-    ...Shadow.glow,
+  },
+  androidWrapper: {
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    borderColor: 'rgba(255, 255, 255, 0.18)', // Borde más vivo para resaltar la forma
+    borderWidth: 1.2,
+    // Sombra sutil para dar elevación
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   content: {
-    position: 'relative',
-    zIndex: 1,
-  },
+    padding: 0, // El padding se maneja externamente si es necesario
+  }
 });
