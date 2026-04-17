@@ -26,10 +26,18 @@ else
     echo "EXPO_PUBLIC_API_URL=http://$IP_LOCAL:8000" > "$ENV_PATH"
 fi
 
-# 3. Habilitar Firewall (Pedirá sudo una vez)
-echo "🛡️ Configurando Firewall..."
-sudo ufw allow 8000/tcp
-sudo ufw allow 8081/tcp
+# 3. Configurar Firewall (Solo si es necesario)
+echo "🛡️ Verificando Firewall..."
+FIREWALL_8000=$(sudo ufw status | grep "8000/tcp" | grep "ALLOW")
+FIREWALL_8081=$(sudo ufw status | grep "8081/tcp" | grep "ALLOW")
+
+if [ -z "$FIREWALL_8000" ] || [ -z "$FIREWALL_8081" ]; then
+    echo "🔐 Abriendo puertos necesarios (8000, 8081)..."
+    sudo ufw allow 8000/tcp
+    sudo ufw allow 8081/tcp
+else
+    echo "✅ Los puertos ya están abiertos en el firewall."
+fi
 
 # 4. Lanzar Terminales (Detección de emulador)
 echo "📂 Lanzando terminales de trabajo..."

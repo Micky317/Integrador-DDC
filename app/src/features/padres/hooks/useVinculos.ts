@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vinculosService } from '../../../services/vinculos.service';
 import { useAppStore } from '../../../store/useAppStore';
 import { useToastStore } from '../../../store/useToastStore';
+import { supabase } from '../../../lib/supabase';
 
 export function useVinculosPadre() {
   const { user } = useAppStore();
@@ -14,6 +16,28 @@ export function useVinculosPadre() {
     queryFn: () => vinculosService.getPacientesVinculados(user!.id),
     enabled: !!user?.id,
   });
+
+  // REALTIME: Refrescar la lista de tarjetas si algún paciente cambia
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('lista-vinculos-padre')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pacientes' },
+        () => {
+          console.log('--- [REALTIME] Un paciente en la lista ha cambiado ---');
+          queryClient.invalidateQueries({ queryKey: ['vinculos', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['paciente'] }); // Invalida cualquier detalle abierto
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   // 2. Vincular nuevo bebé
   const vincularMutation = useMutation({

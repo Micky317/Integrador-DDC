@@ -27,6 +27,7 @@ export interface Paciente {
   ultimaRevision?: string;
   proximaRevision?: string;
   estadoGraf?: EstadoGraf;
+  tratamientoAsignado?: 'ejercicios' | 'arnes' | 'yeso' | 'cirugia' | 'observacion';
 }
 
 export type EstadoGraf = 'GRAF_I' | 'GRAF_IIA' | 'GRAF_IIB' | 'GRAF_IIB_URGENTE' | 'GRAF_III' | 'GRAF_IV';

@@ -83,6 +83,10 @@ export default function TabsLayout() {
         options={{ href: null }}
       />
       <Tabs.Screen
+        name="rehabilitacion"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
         name="evolucion"
         options={{ href: null }}
       />

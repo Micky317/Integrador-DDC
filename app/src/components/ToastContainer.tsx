@@ -1,11 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Animated, SafeAreaView, PanResponder } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Typography, Radius, Shadow, Spacing } from '../constants/theme';
 import { useToastStore, ToastType } from '../store/useToastStore';
-// Faltaría exportar ToastOptions en useToastStore.ts, o directamente tipar el toast aquí:
 
 const TOAST_ICONS: Record<ToastType, keyof typeof Ionicons.glyphMap> = {
   success: 'checkmark-circle',
@@ -22,11 +21,39 @@ const TOAST_COLORS: Record<ToastType, string> = {
 };
 
 const ToastItem = ({ toast }: { toast: { id: string, title: string, message?: string, type: ToastType } }) => {
+  const { hideToast } = useToastStore();
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const pan = useRef(new Animated.ValueXY()).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 5,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy < 0) { // Solo permitir swipe hacia arriba
+          pan.y.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy < -40 || gestureState.vy < -0.5) {
+          // Salida rápida hacia arriba
+          Animated.timing(translateY, {
+            toValue: -200,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => hideToast(toast.id));
+        } else {
+          // Regresar a posición original
+          Animated.spring(pan.y, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
-    // Animación de entrada
     Animated.parallel([
       Animated.spring(translateY, {
         toValue: 0,
@@ -41,7 +68,6 @@ const ToastItem = ({ toast }: { toast: { id: string, title: string, message?: st
       }),
     ]).start();
 
-    // Haptics acorde al tipo
     if (toast.type === 'error') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
     } else if (toast.type === 'success') {
@@ -52,7 +78,18 @@ const ToastItem = ({ toast }: { toast: { id: string, title: string, message?: st
   }, []);
 
   return (
-    <Animated.View style={[styles.toastWrapper, { opacity, transform: [{ translateY }] }]}>
+    <Animated.View 
+      {...panResponder.panHandlers}
+      style={[
+        styles.toastWrapper, 
+        { 
+          opacity, 
+          transform: [
+            { translateY: Animated.add(translateY, pan.y) }
+          ] 
+        }
+      ]}
+    >
       <BlurView intensity={60} tint="dark" style={styles.blurContainer}>
         <View style={styles.innerContainer}>
           <View style={[styles.iconContainer, { backgroundColor: TOAST_COLORS[toast.type] + '20' }]}>
@@ -70,11 +107,10 @@ const ToastItem = ({ toast }: { toast: { id: string, title: string, message?: st
 
 export function ToastContainer() {
   const { toasts } = useToastStore();
-
   if (toasts.length === 0) return null;
 
   return (
-    <SafeAreaView style={styles.globalContainer} pointerEvents="none">
+    <SafeAreaView style={styles.globalContainer} pointerEvents="box-none">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}

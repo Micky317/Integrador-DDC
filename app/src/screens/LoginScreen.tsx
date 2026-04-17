@@ -36,6 +36,12 @@ export default function LoginScreen() {
 
   const { setUser } = useAppStore();
 
+  // Limpiar campos al cambiar de rol
+  React.useEffect(() => {
+    setEmail('');
+    setPassword('');
+  }, [role]);
+
   const handleLogin = async () => {
     if (!role || !email || !password) {
       useToastStore.getState().showToast('Campos requeridos', 'Por favor complete correo y contraseña.', 'error');
@@ -49,7 +55,14 @@ export default function LoginScreen() {
 
       if (data.user) {
         const userDetails = await authService.getCurrentUser();
+        
         if (userDetails) {
+          // VALIDACIÓN DE ROL: Evitar entrar con el rol equivocado seleccionado
+          if (userDetails.role !== role) {
+            await supabase.auth.signOut(); // Desloguear si no coincide
+            throw new Error(`Esta cuenta está registrada como ${userDetails.role === 'medico' ? 'Médico' : 'Padre'}. Por favor selecciona la pestaña correcta.`);
+          }
+
           setUser(userDetails);
           if (userDetails.role === 'medico') {
             router.replace('/(tabs)/pacientes');
@@ -59,7 +72,7 @@ export default function LoginScreen() {
         }
       }
     } catch (err: any) {
-      useToastStore.getState().showToast('Error de acceso', err?.message || 'Credenciales inválidas. Intente de nuevo.', 'error');
+      useToastStore.getState().showToast('Error de acceso', err?.message || 'Credenciales inválidas.', 'error');
     } finally {
       setLoading(false);
     }

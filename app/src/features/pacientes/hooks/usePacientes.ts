@@ -1,18 +1,24 @@
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../../lib/supabase';
 import { Paciente } from '../../../types';
 import { pacientesService } from '../../../services/pacientes.service';
 import { useAppStore } from '../../../store/useAppStore';
 
-export type FilterTab = 'TODOS' | 'URGENTES' | 'EN_SEGUIMIENTO';
+export type FilterTab = 'TODOS' | 'URGENTES' | 'EN_SEGUIMIENTO' | 'EJERCICIOS' | 'ARNES' | 'YESO' | 'CIRUGIA';
 export const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'TODOS', label: 'TODOS' },
   { key: 'URGENTES', label: 'URGENTES' },
-  { key: 'EN_SEGUIMIENTO', label: 'EN SEGUIMIENTO' },
+  { key: 'EN_SEGUIMIENTO', label: 'SEGUIMIENTO' },
+  { key: 'EJERCICIOS', label: 'EJERCICIOS' },
+  { key: 'ARNES', label: 'ARNÉS' },
+  { key: 'YESO', label: 'YESO' },
+  { key: 'CIRUGIA', label: 'CIRUGÍA' },
 ];
 
 export function useListaPacientes() {
   const { user } = useAppStore();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('TODOS');
 
@@ -22,23 +28,54 @@ export function useListaPacientes() {
     enabled: !!user?.id,
   });
 
+  // REALTIME: Refrescar la lista principal del médico
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('lista-pacientes-medico')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pacientes' },
+        () => {
+          console.log('--- [REALTIME-MED] Lista de pacientes actualizada ---');
+          queryClient.invalidateQueries({ queryKey: ['pacientes', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
   const filteredPacientes = useMemo(() => {
     return pacientes.filter((p) => {
       const matchSearch =
         p.nombreCompleto.toLowerCase().includes(search.toLowerCase()) ||
         p.codigoPaciente.toLowerCase().includes(search.toLowerCase());
       
-      const estado = p.estadoGraf || 'GRAF_I';
+      if (!matchSearch) return false;
 
-      if (activeFilter === 'URGENTES') {
-        const urgente = ['GRAF_IIB_URGENTE', 'GRAF_III', 'GRAF_IV'].includes(estado);
-        return matchSearch && urgente;
+      const estado = p.estadoGraf || 'GRAF_I';
+      const tratamiento = p.tratamientoAsignado;
+
+      switch (activeFilter) {
+        case 'URGENTES':
+          return ['GRAF_IIB_URGENTE', 'GRAF_III', 'GRAF_IV'].includes(estado);
+        case 'EN_SEGUIMIENTO':
+          return ['GRAF_IIA', 'GRAF_IIB'].includes(estado);
+        case 'EJERCICIOS':
+          return tratamiento === 'ejercicios';
+        case 'ARNES':
+          return tratamiento === 'arnes';
+        case 'YESO':
+          return tratamiento === 'yeso';
+        case 'CIRUGIA':
+          return tratamiento === 'cirugia';
+        default:
+          return true;
       }
-      if (activeFilter === 'EN_SEGUIMIENTO') {
-        const seguimiento = ['GRAF_IIA', 'GRAF_IIB'].includes(estado);
-        return matchSearch && seguimiento;
-      }
-      return matchSearch;
     });
   }, [search, activeFilter, pacientes]);
 

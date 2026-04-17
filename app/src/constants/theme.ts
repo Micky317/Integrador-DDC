@@ -23,8 +23,8 @@ export const Colors = {
   // Semáforo diagnóstico
   statusNormal: '#00C48C',    // Verde — Normal
   statusWarning: '#FFB400',   // Amarillo — Limítrofe
-  statusDanger: '#FF4757',    // Rojo — Displasia
-  statusUrgent: '#FF4757',
+  statusDanger: '#FF4757',    // Rojo — Severo (Yeso)
+  statusUrgent: '#9B51E0',    // Púrpura — Crítico (Cirugía)
 
   // Texto
   textPrimary: '#FFFFFF',

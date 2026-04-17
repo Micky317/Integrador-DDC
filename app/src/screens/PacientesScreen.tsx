@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TextInput,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -118,33 +119,71 @@ export default function PacientesScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* Search */}
+      {/* Search Bar Refinada */}
       <View style={styles.searchRow}>
-        <Ionicons name="search-outline" size={18} color={Colors.textMuted} style={styles.searchIcon} />
+        <Ionicons 
+          name="search-outline" 
+          size={18} 
+          color={search ? Colors.primary : Colors.textMuted} 
+          style={styles.searchIcon} 
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar por nombre o ID..."
           placeholderTextColor={Colors.textMuted}
           value={search}
           onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
         />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} style={styles.clearBtn}>
+            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Filter Tabs */}
-      <View style={styles.filterRow}>
-        {FILTER_TABS.map((tab) => (
-          <TouchableOpacity key={tab.key} onPress={() => setActiveFilter(tab.key)} activeOpacity={0.8}>
-            {activeFilter === tab.key ? (
-              <LinearGradient colors={Colors.gradientBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.filterTabActive}>
-                <Text style={styles.filterTextActive}>{tab.label}</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.filterTab}>
-                <Text style={styles.filterText}>{tab.label}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+      {/* Filter Tabs — Ahora con ScrollView Horizontal y Colores Dinámicos */}
+      <View style={{ marginBottom: Spacing.md }}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {FILTER_TABS.map((tab) => {
+            const isActive = activeFilter === tab.key;
+            
+            // Definir colores según el tipo de filtro
+            let gradientColors = Colors.gradientBtn;
+            if (tab.key === 'URGENTES' || tab.key === 'YESO') gradientColors = ['#FF4757', '#FF6B81'];
+            if (tab.key === 'CIRUGIA') gradientColors = ['#9B51E0', '#BB6BD9'];
+            if (tab.key === 'ARNES') gradientColors = ['#FFB400', '#FFD32A'];
+            if (tab.key === 'EN_SEGUIMIENTO') gradientColors = ['#4D6EE3', '#6281E9'];
+
+            // Color de texto dinámico para contraste
+            const isDarkBackground = tab.key === 'URGENTES' || tab.key === 'YESO' || tab.key === 'CIRUGIA' || tab.key === 'EN_SEGUIMIENTO';
+            const activeTextColor = isDarkBackground ? '#FFFFFF' : Colors.bgDeep;
+
+            return (
+              <TouchableOpacity key={tab.key} onPress={() => setActiveFilter(tab.key)} activeOpacity={0.8}>
+                {isActive ? (
+                  <LinearGradient 
+                    colors={gradientColors} 
+                    start={{ x: 0, y: 0 }} 
+                    end={{ x: 1, y: 0 }} 
+                    style={styles.filterTabActive}
+                  >
+                    <Text style={[styles.filterTextActive, { color: activeTextColor }]}>{tab.label}</Text>
+                  </LinearGradient>
+                ) : (
+                  <View style={styles.filterTab}>
+                    <Text style={styles.filterText}>{tab.label}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {isLoading ? (
@@ -346,16 +385,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: Typography.size.base,
     fontFamily: Typography.fonts.regular,
+    paddingRight: 8,
   },
-  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.lg, marginBottom: Spacing.md },
+  clearBtn: {
+    padding: 4,
+  },
+  filterScroll: { 
+    paddingHorizontal: Spacing.lg, 
+    gap: 8,
+    paddingBottom: 4 // Pequeño margen para la sombra si hubiera
+  },
   filterTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: Radius.round,
     borderWidth: 1,
     borderColor: Colors.borderDefault,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  filterTabActive: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.round },
+  filterTabActive: { 
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
+    borderRadius: Radius.round,
+    ...Shadow.glow,
+  },
   filterText: {
     color: Colors.textSecondary,
     fontSize: Typography.size.xs,
