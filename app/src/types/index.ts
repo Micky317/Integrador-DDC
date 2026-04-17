@@ -98,3 +98,15 @@ export const labelGraf = (graf: EstadoGraf): string => {
   };
   return labels[graf];
 };
+
+export interface RehabilitacionSesion {
+  id: string;
+  paciente_id: string;
+  padre_id: string;
+  ejercicio_tipo: string;
+  duracion_real_segundos: number;
+  duracion_planificada_segundos: number;
+  completado: boolean;
+  created_at: string;
+  observaciones?: string;
+}
