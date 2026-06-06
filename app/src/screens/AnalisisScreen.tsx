@@ -1,18 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Modal, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Typography, Spacing, Radius, Shadow } from '../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../constants/theme';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { GlassContainer } from '../components/GlassContainer';
 import { KeyPoint } from '../services/analisis.service';
+import { useToastStore } from '../store/useToastStore';
 
-// Importaciones de la nueva arquitectura de Features
-import { useAnalisisIA, useRecalcularAnalisis, useGuardarAnalisis, useAnalisisHistorial } from '../features/analisis/hooks/useAnalisis';
+// Hooks & Logic
+import { 
+  useAnalisisIA, 
+  useRecalcularAnalisis, 
+  useGuardarAnalisis, 
+  useAnalisisHistorial 
+} from '../features/analisis/hooks/useAnalisis';
+
+// Components
 import { EditorPuntosModal } from '../features/analisis/components/EditorPuntosModal';
 import { AnalysisResultCard } from '../features/analisis/components/AnalysisResultCard';
-import LottieView from 'lottie-react-native';
+import { AnalisisImageCard } from '../features/analisis/components/AnalisisImageCard';
+import { ZoomViewerModal } from '../features/analisis/components/ZoomViewerModal';
+
+// Styles
+import { analisisStyles as styles } from '../features/analisis/styles/analisis.styles';
 
 export default function AnalisisScreen() {
   const params = useLocalSearchParams<{ imageUri?: string; pacienteId?: string; modoRapido?: string; analisisId?: string }>();
@@ -28,9 +41,8 @@ export default function AnalisisScreen() {
 
   const isLoading = isLoadingIA || isLoadingDB;
   const isError = isErrorIA;
-  const error = errorIA;
 
-  // Normalizamos la data para que los componentes no se rompan
+  // Normalizamos la data
   const displayData = esHistorial ? {
     angulo_izquierda: dbResult?.anguloIzq || 0,
     angulo_derecha: dbResult?.anguloDer || 0,
@@ -58,36 +70,35 @@ export default function AnalisisScreen() {
     }
   }, [params.imageUri]);
 
-  // Manejo de Errores amigables (ej. foto que no es hueso)
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   useEffect(() => {
     if (isError) {
-      Alert.alert(
+      useToastStore.getState().showToast(
         'Análisis Fallido', 
-        error?.message || 'No se pudo procesar la radiografía. Intente con otra imagen.',
-        [{ text: 'Aceptar', onPress: () => router.back() }]
+        errorIA?.message || 'No se pudo procesar la radiografía. Intente con otra imagen.',
+        'error'
       );
+      router.back();
     }
   }, [isError]);
 
   const handleValidar = () => {
     if (!iaResult || !params.imageUri || !params.pacienteId) {
-      Alert.alert('Error', 'Faltan datos para guardar el análisis.');
+      useToastStore.getState().showToast('Error', 'Faltan datos para guardar el análisis.', 'error');
       return;
     }
+    setShowConfirmModal(true);
+  };
 
-    Alert.alert('¿Validar diagnóstico?', 'Confirma que revisaste el análisis y está correcto para guardarlo en el historial.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { 
-        text: 'Validar y Guardar', 
-        onPress: () => {
-          guardarMutation.mutate({
-            pacienteId: params.pacienteId!,
-            originalUri: params.imageUri!,
-            result: iaResult!
-          });
-        } 
-      },
-    ]);
+  const executeGuardar = () => {
+    setShowConfirmModal(false);
+    guardarMutation.mutate({
+      pacienteId: params.pacienteId!,
+      originalUri: params.imageUri!,
+      result: iaResult!,
+      fechaRadiografia: (params as any).fechaRadiografia,
+    });
   };
 
   const handleAjustarManual = () => {
@@ -97,7 +108,6 @@ export default function AnalisisScreen() {
 
   const handleBack = () => {
     if (esHistorial && params.pacienteId) {
-      // Si venimos del historial, forzamos el regreso al detalle del paciente
       router.replace({ pathname: '/(tabs)/paciente-detalle', params: { id: params.pacienteId } });
     } else {
       router.back();
@@ -111,7 +121,7 @@ export default function AnalisisScreen() {
         : params.imageUri);
 
   return (
-    <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
+    <LinearGradient colors={['#090D1F', '#0D1B3E']} style={styles.gradient}>
       <StatusBar style="light" />
 
       {/* Header */}
@@ -120,50 +130,29 @@ export default function AnalisisScreen() {
           <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
           <Text style={styles.backText}>Atrás</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Clinical Analysis</Text>
+        <Text style={styles.headerTitle}>Análisis Clínico</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.subHeader}>
           <Text style={styles.subLabel}>DDC-CHECK: PASITOS FIRMES</Text>
-          <Text style={styles.mainTitle}>Análisis <Text style={styles.mainTitleBold}>Automatizado</Text></Text>
+          <Text style={styles.mainTitle}>Análisis <Text style={styles.mainTitleBold}>IA YOLOv8</Text></Text>
         </View>
 
-        {/* Scan Image Card */}
-        <TouchableOpacity style={styles.imageCard} activeOpacity={0.9} onPress={() => setShowFullImage(true)}>
-          {currentImageUri ? (
-            <Image source={{ uri: currentImageUri }} style={styles.scanImage} resizeMode="contain" />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Ionicons name="scan" size={48} color={Colors.primary} />
-            </View>
-          )}
+        {/* Tarjeta de Imagen Modular */}
+        <AnalisisImageCard 
+          uri={currentImageUri}
+          isLoading={isLoading || guardarMutation.isPending}
+          scanId={esHistorial ? dbResult?.scanId : undefined}
+          onPress={() => setShowFullImage(true)}
+          loadingText={guardarMutation.isPending ? 'Guardando...' : (esHistorial ? 'Cargando...' : 'Analizando con IA...')}
+        />
 
-          <View style={styles.scanIdTag}><Text style={styles.scanIdText}>SCAN_ID: {esHistorial ? dbResult?.scanId : 'NUEVO'}</Text></View>
-          <View style={styles.zoomHint}><Ionicons name="expand-outline" size={16} color={Colors.primary} /><Text style={styles.zoomText}>Toca para ampliar</Text></View>
-
-          {(isLoading || guardarMutation.isPending) && (
-            <View style={styles.loadingOverlay}>
-              <LottieView
-                autoPlay
-                style={{ width: 100, height: 100 }}
-                source={require('../../assets/lottie/medical-radar.json')}
-                colorFilters={[
-                  { keypath: "Circle", color: Colors.primary }
-                ]}
-              />
-              <Text style={styles.loadingText}>
-                {guardarMutation.isPending ? 'Guardando en historial...' : (esHistorial ? 'Cargando registro...' : 'Procesando con YOLOv8...')}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Results Section */}
+        {/* Resultados */}
         {isLoading ? (
           <View style={styles.loadingSection}>
-            <Text style={styles.loadingSubText}>El modelo YOLOv8 está detectando los puntos clave de la cadera</Text>
+            <Text style={styles.loadingSubText}>Detectando puntos clave de la cadera en tiempo real...</Text>
           </View>
         ) : (iaResult || dbResult) ? (
           <>
@@ -173,78 +162,49 @@ export default function AnalisisScreen() {
               diagnostico_izquierda={displayData.diagnostico_izquierda as any}
               diagnostico_derecha={displayData.diagnostico_derecha as any}
             />
+            
             {esHistorial ? (
               <View style={styles.historialBadge}>
                 <Ionicons name="archive-outline" size={18} color={Colors.textMuted} />
-                <Text style={styles.historialBadgeText}>Este análisis ya forma parte del historial clínico.</Text>
+                <Text style={styles.historialBadgeText}>Este análisis ya está guardado en el historial clínico.</Text>
               </View>
             ) : esRapido ? (
-              // Modo rapido: no hay paciente, ofrecer crear expediente
               <>
                 <View style={styles.rapidoBanner}>
                   <Ionicons name="information-circle-outline" size={18} color="#FFB400" />
                   <Text style={styles.rapidoBannerText}>
-                    Este análisis no se ha guardado. Registra al paciente para vincularlo.
+                    Análisis temporal. Crea un expediente para guardarlo permanentemente.
                   </Text>
                 </View>
                 <PrimaryButton
-                  title="Crear Expediente con este Análisis"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(tabs)/nuevo-paciente',
-                      params: {
-                        imageUri: params.imageUri ?? '',
-                        analisisRapido: '1',
-                      },
-                    })
-                  }
+                  title="Crear Expediente Médico"
+                  onPress={() => router.push({ pathname: '/(tabs)/nuevo-paciente', params: { imageUri: params.imageUri ?? '', analisisRapido: '1' } })}
                   style={styles.validateBtn}
                 />
-                <PrimaryButton title="✂  Ajustar Puntos Manualmente" onPress={handleAjustarManual} variant="secondary" />
+                <PrimaryButton title="Ajustar Puntos Manualmente" onPress={handleAjustarManual} variant="secondary" />
               </>
             ) : (
-              // Flujo normal: guardar en historial del paciente
               <>
                 <PrimaryButton
-                  title={guardarMutation.isPending ? 'Guardando...' : '✓  Guardar Diagnóstico'}
+                  title={guardarMutation.isPending ? 'Guardando...' : '✓ Validar y Guardar'}
                   onPress={handleValidar}
                   style={styles.validateBtn}
                   disabled={guardarMutation.isPending}
                 />
-                <PrimaryButton title="≘  Ajustar Puntos Manualmente" onPress={handleAjustarManual} variant="secondary" disabled={guardarMutation.isPending} />
+                <PrimaryButton title="≘ Ajustar Puntos Manualmente" onPress={handleAjustarManual} variant="secondary" disabled={guardarMutation.isPending} />
               </>
             )}
           </>
         ) : null}
       </ScrollView>
 
-      {/* Solo visualización Full Image Modal */}
-      <Modal visible={showFullImage} transparent={true} animationType="fade">
-        <View style={styles.modalBg}>
-          <TouchableOpacity style={styles.closeModalBtn} onPress={() => setShowFullImage(false)}>
-            <Ionicons name="close-circle" size={44} color="#FFF" />
-          </TouchableOpacity>
-          {currentImageUri && (
-            <ScrollView
-              style={{ flex: 1, width: '100%' }}
-              contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
-              maximumZoomScale={5}
-              minimumZoomScale={1}
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              centerContent
-            >
-              <Image 
-                source={{ uri: currentImageUri }} 
-                style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height }} 
-                resizeMode="contain" 
-              />
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
+      {/* Modales Modulares */}
+      <ZoomViewerModal 
+        visible={showFullImage}
+        onClose={() => setShowFullImage(false)}
+        imageUri={currentImageUri}
+      />
 
-      {/* Editor Modal */}
       <EditorPuntosModal
         visible={showEditor}
         onClose={() => setShowEditor(false)}
@@ -260,53 +220,105 @@ export default function AnalisisScreen() {
           );
         }}
       />
+
+      {/* Modal de Confirmación de Guardado */}
+      <Modal visible={showConfirmModal} animationType="fade" transparent={true}>
+        <View style={customStyles.modalOverlay}>
+          <GlassContainer intensity={40} style={customStyles.modalContainer}>
+            <View style={customStyles.modalHeader}>
+              <View style={customStyles.iconCircle}>
+                <Ionicons name="help-circle-outline" size={32} color={Colors.primary} />
+              </View>
+              <Text style={customStyles.modalTitle}>¿Validar diagnóstico?</Text>
+            </View>
+            <Text style={customStyles.modalText}>
+              Confirma que revisaste el análisis y está correcto. Se guardará permanentemente en el historial clínico.
+            </Text>
+            <View style={customStyles.modalFooter}>
+              <TouchableOpacity 
+                onPress={() => setShowConfirmModal(false)} 
+                style={customStyles.cancelBtn}
+                activeOpacity={0.7}
+              >
+                <Text style={customStyles.cancelBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+              <PrimaryButton 
+                title="Validar y Guardar" 
+                onPress={executeGuardar} 
+                style={customStyles.acceptBtn}
+              />
+            </View>
+          </GlassContainer>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
-  gradient: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingTop: 58, paddingBottom: Spacing.sm },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText: { color: Colors.textPrimary, fontSize: Typography.size.base },
-  headerTitle: { color: Colors.textPrimary, fontSize: Typography.size.lg, fontWeight: Typography.weight.bold },
-  scroll: { paddingHorizontal: Spacing.lg, paddingBottom: 100 },
-  subHeader: { marginBottom: Spacing.md },
-  subLabel: { color: Colors.primary, fontSize: Typography.size.xs, fontWeight: Typography.weight.bold, letterSpacing: 1.5, marginBottom: 4 },
-  mainTitle: { color: Colors.textSecondary, fontSize: Typography.size.xxl, fontWeight: Typography.weight.regular },
-  mainTitleBold: { color: Colors.textPrimary, fontWeight: Typography.weight.extrabold },
-  imageCard: { backgroundColor: Colors.bgCard, borderRadius: Radius.lg, overflow: 'hidden', marginBottom: Spacing.md, height: 220, borderWidth: 1, borderColor: Colors.borderCard, ...Shadow.card },
-  scanImage: { width: '100%', height: '100%' },
-  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bgCardLight },
-  scanIdTag: { position: 'absolute', top: 8, left: 10, backgroundColor: Colors.bgDeep + 'CC', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  scanIdText: { color: Colors.primary, fontSize: 10, fontWeight: Typography.weight.bold, letterSpacing: 1 },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.bgDeep + 'CC', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: Colors.textPrimary, fontSize: Typography.size.sm },
-  loadingSection: { alignItems: 'center', paddingVertical: Spacing.xl },
-  loadingSubText: { color: Colors.textSecondary, fontSize: Typography.size.sm, textAlign: 'center', maxWidth: 280, lineHeight: 20 },
-  rapidoBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(255, 180, 0, 0.08)',
+const customStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  modalContainer: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 180, 0, 0.25)',
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    gap: Spacing.sm,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  iconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.sm,
   },
-  rapidoBannerText: {
-    flex: 1,
+  modalTitle: {
+    color: '#FFF',
+    fontSize: Typography.size.lg,
+    fontFamily: Typography.fonts.bold,
+    textAlign: 'center',
+  },
+  modalText: {
     color: Colors.textSecondary,
     fontSize: Typography.size.sm,
-    lineHeight: 18,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
   },
-  validateBtn: { marginBottom: Spacing.sm },
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
-  fullImage: { width: '100%', height: '80%' },
-  closeModalBtn: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
-  zoomHint: { position: 'absolute', bottom: 10, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  zoomText: { color: Colors.primary, fontSize: 10, fontWeight: 'bold' },
-  historialBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.bgCard, padding: 12, borderRadius: Radius.md, borderLeftWidth: 3, borderLeftColor: Colors.textMuted },
-  historialBadgeText: { color: Colors.textSecondary, fontSize: 12 },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    width: '100%',
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.base,
+    fontFamily: Typography.fonts.semibold,
+  },
+  acceptBtn: {
+    flex: 1.5,
+    height: 50,
+    borderRadius: Radius.md,
+    minHeight: 0,
+  },
 });

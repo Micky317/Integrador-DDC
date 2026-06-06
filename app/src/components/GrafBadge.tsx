@@ -7,7 +7,8 @@ import {
   TextStyle,
 } from 'react-native';
 import { Colors, Spacing, Radius, Typography } from '../constants/theme';
-import { EstadoGraf, colorPorGraf, labelGraf } from '../types';
+import { EstadoGraf } from '../types';
+import { colorPorGraf, labelGraf } from '../constants/clinical';
 
 interface GrafBadgeProps {
   estado: EstadoGraf;

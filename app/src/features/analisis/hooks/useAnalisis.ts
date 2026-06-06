@@ -5,6 +5,7 @@ import { storageService } from '../../../services/storage.service';
 import { useAppStore } from '../../../store/useAppStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { router } from 'expo-router';
+import { handleError } from '../../../utils/errorHandler';
 
 export function useAnalisisIA(imageUri?: string) {
   return useQuery({
@@ -50,11 +51,13 @@ export function useGuardarAnalisis() {
     mutationFn: async ({ 
       pacienteId, 
       originalUri, 
-      result 
+      result,
+      fechaRadiografia
     }: { 
       pacienteId: string; 
       originalUri: string; 
-      result: AnalisisApiResponse 
+      result: AnalisisApiResponse;
+      fechaRadiografia?: string;
     }) => {
       if (!user) throw new Error('Usuario no autenticado');
 
@@ -75,7 +78,9 @@ export function useGuardarAnalisis() {
         categoriaGraf: (result as any).categoria_graf || 'GRAF_IIA',
         imagenOriginalUrl: urlOriginal,
         imagenAnotadaUrl: urlAnotada,
+        validadoPorDoctor: true,
         medicoId: user.id,
+        fechaRadiografia,
       });
     },
     onSuccess: (_, variables) => {
@@ -83,8 +88,24 @@ export function useGuardarAnalisis() {
       queryClient.invalidateQueries({ queryKey: ['historial', variables.pacienteId] });
       router.replace({ pathname: '/(tabs)/paciente-detalle', params: { id: variables.pacienteId } });
     },
-    onError: (error: any) => {
-      showToast('Error', 'No se pudo guardar el análisis: ' + error.message, 'error');
-    }
+    onError: (error: any) => handleError(error, 'Guardado de Análisis en Historial')
+  });
+}
+
+export function useActualizarFechaRadiografia(pacienteId: string) {
+  const { showToast } = useToastStore();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ analisisId, fecha }: { analisisId: string; fecha: string }) => {
+      await historialService.updateFechaRadiografia(analisisId, fecha);
+    },
+    onSuccess: () => {
+      showToast('Actualizado', 'Fecha de radiografía corregida.', 'success');
+      queryClient.invalidateQueries({ queryKey: ['historial', pacienteId] });
+      // También podríamos invalidar el progreso / evolución si es necesario
+      queryClient.invalidateQueries({ queryKey: ['paciente', pacienteId] });
+    },
+    onError: (error: any) => handleError(error, 'Actualizar Fecha')
   });
 }

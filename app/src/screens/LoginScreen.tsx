@@ -23,6 +23,7 @@ import { supabase } from '../lib/supabase';
 import { authService } from '../services/auth.service';
 import { useAppStore } from '../store/useAppStore';
 import { useToastStore } from '../store/useToastStore';
+import { handleError } from '../utils/errorHandler';
 import { TouchableScale } from '../components/TouchableScale';
 import { GlassContainer } from '../components/GlassContainer';
 
@@ -72,7 +73,7 @@ export default function LoginScreen() {
         }
       }
     } catch (err: any) {
-      useToastStore.getState().showToast('Error de acceso', err?.message || 'Credenciales inválidas.', 'error');
+      handleError(err, 'Inicio de Sesión');
     } finally {
       setLoading(false);
     }
@@ -170,9 +171,9 @@ export default function LoginScreen() {
             if (userDetails) {
               setUser(userDetails);
               if (userDetails.role === 'medico') {
-                router.replace('/pacientes');
+                router.replace('/(tabs)/pacientes');
               } else {
-                router.replace('/progreso');
+                router.replace('/(tabs)/progreso');
               }
             }
           }
@@ -181,13 +182,13 @@ export default function LoginScreen() {
         }
       }).catch((err) => {
         console.error('=== OAUTH ERROR ===', err);
-        useToastStore.getState().showToast('Error', err.message || 'No se pudo conectar con Google.', 'error');
+        handleError(err, 'Autenticación Google');
         setLoading(false);
       });
 
     } catch (err: any) {
       console.error('=== OAUTH ERROR ===', err);
-      useToastStore.getState().showToast('Error', err.message || 'No se pudo conectar con Google.', 'error');
+      handleError(err, 'Autenticación Google');
       setLoading(false);
     }
   };

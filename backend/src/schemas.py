@@ -18,3 +18,9 @@ class HealthCheck(BaseModel):
     status: str
     modelo_cargado: bool
     version: str
+
+class VideoAnalysisResult(BaseModel):
+    tecnica_correcta: bool
+    confianza: float
+    feedback: str # Ej: "Abre más las piernas", "Mantén 5 segundos"
+    frames_procesados: int

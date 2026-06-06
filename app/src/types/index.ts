@@ -27,7 +27,7 @@ export interface Paciente {
   ultimaRevision?: string;
   proximaRevision?: string;
   estadoGraf?: EstadoGraf;
-  tratamientoAsignado?: 'ejercicios' | 'arnes' | 'yeso' | 'cirugia' | 'observacion';
+  tratamientosAsignados?: string[];
 }
 
 export type EstadoGraf = 'GRAF_I' | 'GRAF_IIA' | 'GRAF_IIB' | 'GRAF_IIB_URGENTE' | 'GRAF_III' | 'GRAF_IV';
@@ -45,7 +45,9 @@ export interface Analisis {
   imagenOriginalUrl?: string;
   validadoPorDoctor: boolean;
   notas?: string;
+  medicoId: string;
   creadoEn: string;
+  fechaRadiografia?: string;
 }
 
 export type DiagnosticoCategoria = 'NORMAL' | 'LIMITROFE' | 'DISPLASIA';
@@ -63,39 +65,24 @@ export interface ApiAnalysisResponse {
   };
 }
 
+export interface PrescripcionMedica {
+  id: string;
+  pacienteId: string;
+  medicoId: string;
+  diagnosticoResumen: string;
+  tratamientos: string[];
+  indicaciones?: string;
+  proximaRevision?: string;
+  analisisId?: string;
+  creadoEn: string;
+}
+
 export interface TabParam {
   screen: string;
   pacienteId?: string;
   analisisId?: string;
 }
 
-// Util: color por diagnóstico
-export const colorPorDiagnostico = (dx: DiagnosticoCategoria): string => {
-  switch (dx) {
-    case 'NORMAL': return '#00C48C';
-    case 'LIMITROFE': return '#FFB400';
-    case 'DISPLASIA': return '#FF4757';
-  }
-};
 
-export const colorPorGraf = (graf: EstadoGraf): string => {
-  if (graf === 'GRAF_I') return '#00C48C';
-  if (graf === 'GRAF_IIA') return '#4D6EE3';
-  if (graf === 'GRAF_IIB') return '#FFB400';
-  if (graf === 'GRAF_IIB_URGENTE') return '#FF4757';
-  if (graf === 'GRAF_III') return '#FF4757';
-  if (graf === 'GRAF_IV') return '#FF4757';
-  return '#8892B0';
-};
-
-export const labelGraf = (graf: EstadoGraf): string => {
-  const labels: Record<EstadoGraf, string> = {
-    GRAF_I: 'Graf I - NORMAL',
-    GRAF_IIA: 'Graf IIa - EN OBSERVACIÓN',
-    GRAF_IIB: 'Graf IIb - EN SEGUIMIENTO',
-    GRAF_IIB_URGENTE: 'Graf IIb - REVISIÓN URGENTE',
-    GRAF_III: 'Graf III - DISPLASIA',
-    GRAF_IV: 'Graf IV - DISPLASIA SEVERA',
-  };
-  return labels[graf];
-};
+// El archivo de tipos ahora es puramente declarativo. 
+// La lógica de colores y labels se movió a constants/clinical.ts

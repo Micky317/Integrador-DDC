@@ -1,0 +1,9 @@
+{
+    "a": -0.003369,
+    "b": -0.419446,
+    "c": 31.762887,
+    "r_squared": 0.8419,
+    "description": "Modelo de osificaci\u00f3n normal polinomial grado 2 (Dataset MTDDH)",
+    "unit_age": "meses",
+    "unit_angle": "grados"
+}

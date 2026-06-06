@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Typography, Radius, Spacing } from '../../../constants/theme';
 import { GlassContainer } from '../../../components/GlassContainer';
 import { GrafBadge } from '../../../components/GrafBadge';
-import { Analisis, colorPorDiagnostico } from '../../../types';
+import { Analisis } from '../../../types';
+import { colorPorDiagnostico } from '../../../constants/clinical';
+import { useActualizarFechaRadiografia } from '../../analisis/hooks/useAnalisis';
+import { useAppStore } from '../../../store/useAppStore';
+import { parseDateSafe, formatLocalDate } from '../../../utils/helpers';
 
 interface AnalisisHistorialCardProps {
   analisis: Analisis;
@@ -12,11 +17,30 @@ interface AnalisisHistorialCardProps {
 }
 
 export const AnalisisHistorialCard = ({ analisis, onPress }: AnalisisHistorialCardProps) => {
-  const fecha = new Date(analisis.creadoEn).toLocaleDateString('es-BO', {
+  const { user } = useAppStore();
+  const isMedico = user?.role === 'medico';
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const { mutate: actualizarFecha } = useActualizarFechaRadiografia(analisis.pacienteId);
+
+  const fechaRegistro = new Date(analisis.creadoEn).toLocaleDateString('es-BO', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   });
+
+  const fechaPlaca = analisis.fechaRadiografia 
+    ? parseDateSafe(analisis.fechaRadiografia) 
+    : new Date(analisis.creadoEn); // fallback if null
+
+  const onChangeDate = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate && event.type === 'set') {
+      actualizarFecha({ 
+        analisisId: analisis.id, 
+        fecha: formatLocalDate(selectedDate) 
+      });
+    }
+  };
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.wrapper}>
@@ -27,8 +51,38 @@ export const AnalisisHistorialCard = ({ analisis, onPress }: AnalisisHistorialCa
             <Ionicons name="scan-outline" size={14} color={Colors.primary} />
             <Text style={styles.scanId}>{analisis.scanId || 'SIN ID'}</Text>
           </View>
-          <Text style={styles.fecha}>{fecha}</Text>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={styles.fecha}>Registrado: {fechaRegistro}</Text>
+          </View>
         </View>
+
+        {/* Fecha Radiografia Row with Edit */}
+        <View style={styles.fechaPlacaRow}>
+          <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
+          <Text style={styles.fechaPlacaLabel}>Placa del:</Text>
+          <Text style={styles.fechaPlacaValue}>
+            {fechaPlaca.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </Text>
+          {isMedico && (
+            <TouchableOpacity 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} 
+              onPress={() => setShowDatePicker(true)}
+              style={{ marginLeft: 4 }}
+            >
+              <Ionicons name="pencil" size={14} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={fechaPlaca}
+            mode="date"
+            display="default"
+            onChange={onChangeDate}
+            maximumDate={new Date()}
+          />
+        )}
 
         {/* Angle pills */}
         <View style={styles.anglesRow}>
@@ -101,6 +155,26 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: Typography.size.xs,
     fontFamily: Typography.fonts.regular,
+  },
+  fechaPlacaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: Radius.sm,
+    alignSelf: 'flex-start',
+  },
+  fechaPlacaLabel: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.fonts.regular,
+  },
+  fechaPlacaValue: {
+    color: Colors.textPrimary,
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.fonts.semibold,
   },
   anglesRow: {
     flexDirection: 'row',

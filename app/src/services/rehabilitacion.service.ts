@@ -98,5 +98,56 @@ export const rehabilitacionService = {
 
     if (error) throw error;
     return true;
+  },
+
+  // 5. Obtener historial de actividad completo
+  async getHistorialActividad(pacienteId: string): Promise<RegistroActividad[]> {
+    const { data, error } = await supabase
+      .from('historial_rehabilitacion')
+      .select('*')
+      .eq('paciente_id', pacienteId)
+      .order('fecha', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  // 6. Evaluar el video subido por el paciente
+  async evaluarVideo(pacienteId: string, ejercicioId: string, estado: 'Aprobado' | 'Rechazado', comentario?: string) {
+    // Buscamos el seguimiento más reciente del paciente en estado "En revisión"
+    const { data, error } = await supabase
+      .from('seguimiento_ejercicios')
+      .update({
+        estado,
+        comentarios_medico: comentario,
+        calificacion_medico: estado === 'Aprobado' ? 5 : 1,
+      })
+      .eq('paciente_id', pacienteId)
+      .eq('estado', 'En revisión')
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // 7. Eliminar un seguimiento específico (Médico)
+  async eliminarSeguimiento(seguimientoId: string, videoPath?: string) {
+    // 1. Borrar de la base de datos
+    const { error: dbError } = await supabase
+      .from('seguimiento_ejercicios')
+      .delete()
+      .eq('id', seguimientoId);
+
+    if (dbError) throw dbError;
+
+    // 2. Borrar del storage si existe el path
+    if (videoPath) {
+      await supabase.storage
+        .from('ejercicios_videos')
+        .remove([videoPath]);
+    }
+
+    return true;
   }
 };

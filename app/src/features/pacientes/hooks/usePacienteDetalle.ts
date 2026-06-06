@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase';
 import { pacientesService } from '../../../services/pacientes.service';
 import { historialService } from '../../../services/historial.service';
 import { useToastStore } from '../../../store/useToastStore';
+import { handleError } from '../../../utils/errorHandler';
 import { useAppStore } from '../../../store/useAppStore';
 import { router } from 'expo-router';
 
@@ -82,15 +83,13 @@ export function useActualizarTratamiento(pacienteId: string) {
   const { showToast } = useToastStore();
 
   return useMutation({
-    mutationFn: (tratamiento: string) => pacientesService.updateTratamiento(pacienteId, tratamiento),
+    mutationFn: (tratamientos: string[]) => pacientesService.updateTratamiento(pacienteId, tratamientos),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['paciente', pacienteId] });
       queryClient.invalidateQueries({ queryKey: ['pacientes'] });
       showToast('Tratamiento actualizado', 'El plan de tratamiento ha sido guardado.', 'success');
     },
-    onError: () => {
-      showToast('Error', 'No se pudo actualizar el tratamiento.', 'error');
-    },
+    onError: (error: any) => handleError(error, 'Actualizar Tratamiento'),
   });
 }
 
@@ -105,8 +104,6 @@ export function useEliminarPaciente(pacienteId: string) {
       showToast('Paciente eliminado', 'El registro fue eliminado correctamente.', 'success');
       router.replace('/(tabs)/pacientes');
     },
-    onError: () => {
-      showToast('Error', 'No se pudo eliminar el paciente. Intenta de nuevo.', 'error');
-    },
+    onError: (error: any) => handleError(error, 'Eliminar Paciente'),
   });
 }

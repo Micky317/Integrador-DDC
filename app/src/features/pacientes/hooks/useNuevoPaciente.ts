@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { pacientesService } from '../../../services/pacientes.service';
 import { useAppStore } from '../../../store/useAppStore';
 import { useToastStore } from '../../../store/useToastStore';
+import { handleError } from '../../../utils/errorHandler';
 
 export function useNuevoPaciente() {
   const { user } = useAppStore();
@@ -47,7 +48,7 @@ export function useNuevoPaciente() {
       if (context?.previousPacientes) {
         queryClient.setQueryData(['pacientes', user?.id], context.previousPacientes);
       }
-      useToastStore.getState().showToast('Error', error.message || 'No se pudo registrar el paciente.', 'error');
+      handleError(error, 'Registro de Paciente');
     },
     onSettled: () => {
       // Siempre refrescar al final para asegurar sincronización con servidor gane quien gane

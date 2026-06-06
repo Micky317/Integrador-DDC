@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -12,13 +11,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Colors, Typography, Spacing, Radius } from '../constants/theme';
+import { Colors } from '../constants/theme';
 import { AppInput } from '../components/AppInput';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { TouchableScale } from '../components/TouchableScale';
 import { GlassContainer } from '../components/GlassContainer';
 import { supabase } from '../lib/supabase';
 import { useToastStore } from '../store/useToastStore';
+import { authStyles as styles } from '../features/auth/styles/auth.styles';
 
 export default function RegisterPadreScreen() {
   const [fullName, setFullName] = useState('');
@@ -61,16 +61,16 @@ export default function RegisterPadreScreen() {
       if (error) throw error;
 
       if (data.user) {
+        // Insertar perfil en la tabla profiles
         await supabase.from('profiles').upsert({
           id: data.user.id,
           nombre_completo: fullName,
           rol: 'padre',
-          telefono: phone || null,
-          matricula_validada: false,
+          telefono: phone,
         });
 
         showToast(
-          'Cuenta creada',
+          '¡Bienvenido!',
           'Revisa tu correo para confirmar tu cuenta.',
           'success',
           5000
@@ -87,15 +87,14 @@ export default function RegisterPadreScreen() {
   const handleSocialLogin = (provider: 'google' | 'apple') => {
     showToast(
       'Próximamente',
-      `Configura el Client ID de ${provider === 'google' ? 'Google' : 'Apple'} en Supabase Auth.`,
-      'info',
-      4000
+      `La integración con ${provider} requiere configuración de IDs.`,
+      'info'
     );
   };
 
   return (
     <LinearGradient
-      colors={['#090D1F', '#1B0D3E', '#090D1F']}
+      colors={['#090D1F', '#0D1B3E', '#090D1F']}
       locations={[0, 0.5, 1]}
       style={styles.gradient}
     >
@@ -122,13 +121,13 @@ export default function RegisterPadreScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.iconWrapper}>
-              <LinearGradient colors={['#FFB400', '#FF7043']} style={styles.iconGrad}>
-                <Ionicons name="heart-outline" size={26} color="#090D1F" />
+              <LinearGradient colors={['#FFB400', '#FF8000']} style={styles.iconGrad}>
+                <Ionicons name="people-outline" size={26} color="#090D1F" />
               </LinearGradient>
             </View>
-            <Text style={styles.title}>Acceso Familiar</Text>
+            <Text style={styles.title}>Registro Familiar</Text>
             <Text style={styles.subtitle}>
-              Consulta el progreso y evolución{'\n'}de tu bebé en tiempo real
+              Acompaña el desarrollo de tu pequeño{'\n'}con el respaldo de especialistas
             </Text>
           </View>
 
@@ -151,7 +150,7 @@ export default function RegisterPadreScreen() {
           {/* Divider */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>o regístrate con correo</Text>
+            <Text style={styles.dividerText}>o con tu correo</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -161,14 +160,14 @@ export default function RegisterPadreScreen() {
               icon="person-outline"
               placeholder="Nombre completo"
               value={fullName}
-              onChangeText={setFullName}
+              onChangeText={fullName => setFullName(fullName)}
               autoCapitalize="words"
             />
             <AppInput
               icon="at-outline"
               placeholder="Correo electrónico"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={email => setEmail(email)}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -177,34 +176,26 @@ export default function RegisterPadreScreen() {
               icon="call-outline"
               placeholder="Teléfono (opcional)"
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={phone => setPhone(phone)}
               keyboardType="phone-pad"
             />
             <AppInput
               icon="lock-closed-outline"
               placeholder="Contraseña (mín. 8 caracteres)"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={pass => setPassword(pass)}
               secureTextEntry
             />
             <AppInput
               icon="shield-checkmark-outline"
               placeholder="Confirmar contraseña"
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={pass => setConfirmPassword(pass)}
               secureTextEntry
             />
 
-            {/* Info card */}
-            <View style={styles.infoCard}>
-              <Ionicons name="lock-closed-outline" size={18} color={Colors.statusWarning} />
-              <Text style={styles.infoText}>
-                Para ver los análisis de tu hijo, el médico debe vincularte con el perfil del paciente.
-              </Text>
-            </View>
-
             <PrimaryButton
-              title="Crear cuenta familiar"
+              title="Crear cuenta"
               onPress={handleRegister}
               loading={loading}
               style={styles.registerBtn}
@@ -223,138 +214,3 @@ export default function RegisterPadreScreen() {
     </LinearGradient>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  gradient: { flex: 1 },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xl,
-  },
-
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    marginBottom: Spacing.lg,
-  },
-  backText: {
-    color: Colors.textPrimary,
-    fontSize: Typography.size.base,
-    fontFamily: Typography.fonts.medium,
-  },
-
-  // Header
-  header: { alignItems: 'center', marginBottom: Spacing.xl },
-  iconWrapper: {
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    marginBottom: Spacing.md,
-    shadowColor: '#FFB400',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  iconGrad: {
-    width: 60,
-    height: 60,
-    borderRadius: Radius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    color: Colors.textPrimary,
-    fontSize: Typography.size.xl,
-    fontFamily: Typography.fonts.bold,
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: Colors.textSecondary,
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.fonts.regular,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
-    lineHeight: 20,
-  },
-
-  // Social
-  socialRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.xl },
-  socialBtnWrapper: { flex: 1 },
-  socialBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    gap: 8,
-  },
-  socialBtnText: {
-    color: '#FFF',
-    fontSize: Typography.size.base,
-    fontFamily: Typography.fonts.semibold,
-  },
-
-  // Divider
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-    gap: Spacing.md,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.borderDefault },
-  dividerText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.size.xs,
-    fontFamily: Typography.fonts.medium,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-
-  // Form
-  form: { gap: 0 },
-
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(255,180,0,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,180,0,0.2)',
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  infoText: {
-    flex: 1,
-    color: Colors.textSecondary,
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.fonts.regular,
-    lineHeight: 18,
-  },
-
-  registerBtn: { marginTop: Spacing.md },
-
-  // Footer
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: Spacing.xl,
-    paddingBottom: Spacing.xl,
-  },
-  footerText: {
-    color: Colors.textSecondary,
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.fonts.regular,
-  },
-  footerLink: {
-    color: Colors.primary,
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.fonts.semibold,
-  },
-});

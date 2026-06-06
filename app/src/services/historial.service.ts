@@ -16,6 +16,7 @@ const mapAnalisis = (a: any): Analisis => ({
   notas: a.notas,
   medicoId: a.medico_id,
   creadoEn: a.created_at,
+  fechaRadiografia: a.fecha_radiografia,
 });
 
 export const historialService = {
@@ -66,11 +67,23 @@ export const historialService = {
         validado_por_doctor: true,
         notas: analisis.notas,
         medico_id: analisis.medicoId,
+        fecha_radiografia: analisis.fechaRadiografia,
       }])
       .select()
       .single();
 
     if (error) throw error;
+
+    // 2. Sincronizar con InfluxDB via sync completo (garantiza timestamps limpios y sin duplicados)
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.2:8005';
+      await fetch(`${API_URL}/clinical/sync`, {
+        method: 'POST',
+      });
+    } catch (e) {
+      console.warn("[HistorialService] Error sincronizando InfluxDB después de crear análisis:", e);
+    }
+
     return mapAnalisis(data);
   },
 
@@ -83,5 +96,26 @@ export const historialService = {
       .update({ notas, validado_por_doctor: true })
       .eq('id', analisisId);
     if (error) throw error;
+  },
+
+  /**
+   * Actualiza la fecha real de la radiografía
+   */
+  async updateFechaRadiografia(analisisId: string, fecha: string): Promise<void> {
+    const { error } = await supabase
+      .from('analisis')
+      .update({ fecha_radiografia: fecha })
+      .eq('id', analisisId);
+    if (error) throw error;
+
+    // Sincronizar de inmediato con el backend para actualizar InfluxDB
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.2:8005';
+      await fetch(`${API_URL}/clinical/sync`, {
+        method: 'POST',
+      });
+    } catch (e) {
+      console.warn("[HistorialService] Error al sincronizar después de actualizar fecha:", e);
+    }
   },
 };

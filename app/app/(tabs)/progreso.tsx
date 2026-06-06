@@ -103,7 +103,7 @@ export default function MisBebesScreen() {
             icon="play-circle"
             onPress={() => {
               console.log('[Progreso] Navegando a rehab con bebe.id:', bebe.id);
-              router.push({ pathname: '/(tabs)/rehabilitacion', params: { id: bebe.id } });
+              router.push({ pathname: '/rehabilitacion', params: { id: bebe.id } });
             }}
             style={styles.heroActionBtn}
           />

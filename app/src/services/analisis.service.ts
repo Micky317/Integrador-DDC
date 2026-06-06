@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? 'http://localhost:8000' : 'http://192.168.0.8:8000');
+const API_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? 'http://localhost:8005' : 'http://192.168.0.2:8005');
 
 export interface KeyPoint {
   id: number;

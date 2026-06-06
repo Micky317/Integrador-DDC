@@ -1,275 +1,480 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator, Dimensions, Image } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Typography, Spacing, Radius, Shadow } from '../constants/theme';
-import { GlassContainer } from '../components/GlassContainer';
-import { PrimaryButton } from '../components/PrimaryButton';
-import { usePacienteDetalle } from '../features/pacientes/hooks/usePacienteDetalle';
-import { useRehabilitacion } from '../features/rehabilitacion/hooks/useRehabilitacion';
-import { Ejercicio, CATALOGO_EJERCICIOS } from '../constants/ejercicios';
-import { Prescripcion } from '../services/rehabilitacion.service';
+import * as Speech from 'expo-speech';
+import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
+import { useLocalSearchParams, router } from 'expo-router';
 
-// Componente de Animación Memorizado para evitar parpadeos por el timer
-const EjercicioAnimacion = React.memo(({ ex }: { ex: Ejercicio }) => {
-  if (!ex.id?.includes('ranita') && !ex.videoLocal) return null;
-  
-  return (
-    <Image 
-      source={ex.id?.includes('ranita') ? require('../../assets/animations/rehab_anim.gif') : ex.videoLocal} 
-      style={{ width: '100%', height: '100%', borderRadius: 16 }}
-      resizeMode="cover"
-    />
-  );
-});
+// UI Components
+import { PrimaryButton } from '../components/PrimaryButton';
+import { GlassContainer } from '../components/GlassContainer';
+import { ConsentimientoLegalModal } from '../components/ConsentimientoLegalModal';
+import { VideoRecorderScreen } from '../components/VideoRecorderScreen';
+import { TimerProgress } from '../features/rehabilitacion/components/TimerProgress';
+import { EjercicioAnimacion } from '../features/rehabilitacion/components/EjercicioAnimacion';
+import { EjercicioListItem } from '../features/rehabilitacion/components/EjercicioListItem';
+import { ConfigEjercicioModal } from '../features/rehabilitacion/components/ConfigEjercicioModal';
+import { VoiceSelector } from '../features/rehabilitacion/components/VoiceSelector';
+
+// Logic & Hooks
+import { useRehabilitacion } from '../features/rehabilitacion/hooks/useRehabilitacion';
+import { styles } from '../features/rehabilitacion/styles/rehabilitacion.styles';
+import { Colors, Spacing, Radius, Typography } from '../constants/theme';
+import { Texts } from '../constants/texts';
+import { useToastStore } from '../store/useToastStore';
+import { pacientesService } from '../services/pacientes.service';
+import { Paciente } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const styles = StyleSheet.create({
-  gradient: { flex: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1225' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: 60, alignItems: 'center', paddingBottom: 10 },
-  topTitle: { color: '#FFF', fontSize: Typography.size.lg, fontFamily: Typography.fonts.bold },
-  scroll: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: 120 },
-  
-  babyHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 30, backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: Radius.lg },
-  avatarMini: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary + '20', alignItems: 'center', justifyContent: 'center' },
-  avatarMiniText: { color: Colors.primary, fontWeight: 'bold', fontSize: 18 },
-  babyName: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  instruction: { color: Colors.textSecondary, fontSize: 12 },
-
-  // List Item Styles
-  exerciseListItem: { flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 16, gap: 16 },
-  exIconContainer: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  exTitle: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  exSub: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
-  badgeRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  badgeText: { color: Colors.textSecondary, fontSize: 11 },
-
-  // Player Styles
-  videoCard: { height: 220, borderRadius: Radius.xl, overflow: 'hidden', marginBottom: Spacing.xl, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.2)' },
-  videoStyle: { flex: 1, width: '100%', height: '100%' },
-  fallbackMedia: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  videoText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '600' },
-  timerContainer: { alignItems: 'center', marginBottom: Spacing.xl },
-  timerCircle: { 
-    width: 160, 
-    height: 160, 
-    borderRadius: 80, 
-    borderWidth: 6, 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    marginBottom: Spacing.xl
-  },
-  timerNumber: { color: '#FFF', fontSize: 50, fontFamily: Typography.fonts.bold },
-  timerLabel: { color: Colors.textMuted, fontSize: 12, textTransform: 'uppercase' },
-  mainBtn: { width: 240, height: 60, borderRadius: 30 },
-  
-  sectionTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: Spacing.md },
-  instructionCard: { padding: Spacing.lg, gap: 16 },
-  step: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  numBadge: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
-  stepNum: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
-  stepNumText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
-  stepText: { flex: 1, color: Colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  
-  emptyState: { padding: 40, alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 40 },
-  emptyText: { color: Colors.textMuted, fontSize: 16, textAlign: 'center' },
-});
-
 export default function RehabilitacionScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { paciente, isLoading: isPacLoading } = usePacienteDetalle(id ?? '');
-  const { prescripciones, isLoading: isRehabLoading, registrarActividad } = useRehabilitacion(id ?? '');
-  
-  const [activeExercise, setActiveExercise] = useState<Prescripcion | null>(null);
+  const { id } = useLocalSearchParams();
+  const pacienteId = (id as string) || ""; 
+
+  const { 
+    prescripciones, seguimientos, isLoading: isRehabLoading, registrarActividad, uploadVideo 
+  } = useRehabilitacion(pacienteId);
+  const { showToast } = useToastStore();
+
+  // States
+  const [paciente, setPaciente] = useState<Paciente | null>(null);
+  const [activeEx, setActiveEx] = useState<any>(null);
   const [sessionActive, setSessionActive] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0); 
-  const [isFinished, setIsFinished] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentRep, setCurrentRep] = useState(1);
+  const [currentSerie, setCurrentSerie] = useState(1);
+  const [seconds, setSeconds] = useState(0);
+  const [totalActiveSeconds, setTotalActiveSeconds] = useState(0);
+  const [showConfig, setShowConfig] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
+  const [showVideoRecorder, setShowVideoRecorder] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
-  // Memorizar el ejercicio para evitar re-renders infinitos
-  // SIEMPRE arriba de cualquier return temprano
-  const ex = React.useMemo(() => {
-    if (!activeExercise) return null;
-    const catalogoInfo = CATALOGO_EJERCICIOS.find(e => e.id === activeExercise.ejercicio_id);
-    return { ...catalogoInfo, ...activeExercise.ejercicio } as Ejercicio;
-  }, [activeExercise?.id, activeExercise?.ejercicio_id]);
+  // Config States
+  const [configSesiones, setConfigSesiones] = useState(3);
+  const [configMins, setConfigMins] = useState(5);
+  const [configSecs, setConfigSecs] = useState(0);
+  const [configRestMins, setConfigRestMins] = useState(0);
+  const [configRestSecs, setConfigRestSecs] = useState(30);
+  const [isResting, setIsResting] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
-  // Lógica del temporizador
+  // Voice States
+  const [availableVoices, setAvailableVoices] = useState<Speech.Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<Speech.Voice | null>(null);
+
+  useEffect(() => {
+    loadVoices();
+    loadPaciente();
+    checkConsent();
+    return () => { Speech.stop(); };
+  }, []);
+
+  const checkConsent = async () => {
+    try {
+      const accepted = await SecureStore.getItemAsync('rehab_consent_accepted');
+      if (accepted === 'true') {
+        setConsentAccepted(true);
+      }
+    } catch (e) {
+      console.error("Error al cargar consentimiento:", e);
+    }
+  };
+
+  const loadPaciente = async () => {
+    if (!pacienteId) return;
+    try {
+      const data = await pacientesService.getPacienteById(pacienteId);
+      setPaciente(data);
+    } catch (e) {
+      console.error("Error cargando paciente:", e);
+    }
+  };
+
+  const loadVoices = async () => {
+    const voices = await Speech.getAvailableVoicesAsync();
+    const esVoices = voices.filter(v => v.language.includes('es'));
+    setAvailableVoices(esVoices);
+    if (esVoices.length > 0) setSelectedVoice(esVoices[0]);
+  };
+
+  // Efecto que maneja el incremento de los segundos (reloj principal)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (sessionActive && timeLeft > 0) {
+    
+    // Si la sesión está activa y no está en pausa, corremos el reloj
+    if (sessionActive && !isPaused) {
       interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
+        setSeconds(s => s + 1);
+        if (!isResting) {
+          setTotalActiveSeconds(prev => prev + 1);
+        }
       }, 1000);
-    } else if (timeLeft === 0 && sessionActive) {
-      setSessionActive(false);
-      setIsFinished(true);
-      if (activeExercise && activeExercise.ejercicio) {
-        // Guardar el tiempo total prescrito
-        registrarActividad({ 
-          ejercicioId: activeExercise.ejercicio_id, 
-          duracionSegundos: activeExercise.ejercicio.duracionSegundos 
-        });
-      }
     }
-    return () => clearInterval(interval);
-  }, [sessionActive, timeLeft]);
 
-  const handleStartExercise = (p: Prescripcion) => {
-    setActiveExercise(p);
-    const duration = p.ejercicio?.duracionSegundos || 30; // 30s fallback
-    setTimeLeft(duration); 
+    // Al desmontar, pausar o cerrar, limpiamos el intervalo para que no hayan bugs de tiempo
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [sessionActive, isPaused, isResting]);
+
+  useEffect(() => {
+    if (!sessionActive || isPaused) return;
+
+    const totalActiveTime = configMins * 60 + configSecs;
+    const totalRestTime = configRestMins * 60 + configRestSecs;
+
+    if (!isResting && seconds >= totalActiveTime) {
+      if (currentSerie < configSesiones) {
+        // Start rest
+        setIsResting(true);
+        setSeconds(0);
+        speak(`Sesión completada. Descansa por ${configRestMins > 0 ? configRestMins + ' minutos y ' : ''}${configRestSecs} segundos.`);
+      } else {
+        // Finish completely
+        handleFinishSession();
+      }
+    } else if (isResting && seconds >= totalRestTime) {
+      // End rest, start next session
+      setIsResting(false);
+      setSeconds(0);
+      setCurrentSerie(s => s + 1);
+      speak(`Descanso finalizado. Iniciando sesión ${currentSerie + 1} de ${configSesiones}.`);
+    }
+  }, [seconds, isResting, sessionActive, isPaused]);
+
+  const handleSelectEjercicio = (ex: any) => {
+    setActiveEx(ex);
+    setShowConfig(true);
+  };
+
+  const handleStartSession = () => {
+    setShowConfig(false);
     setSessionActive(true);
-    setIsFinished(false);
+    setSeconds(0);
+    setTotalActiveSeconds(0);
+    setCurrentRep(1);
+    setCurrentSerie(1);
+    setIsPaused(false); // Make sure it's not paused
+    speak(`Iniciando ${activeEx.ejercicio.nombre}. ${activeEx.ejercicio.descripcion || ''}. Realiza el ejercicio por ${configMins} minutos y ${configSecs} segundos en ${configSesiones} sesiones.`);
+  };
+
+  const speak = (text: string) => {
+    if (isMuted) {
+      Speech.stop();
+      return;
+    }
+    if (selectedVoice) {
+      Speech.speak(text, { voice: selectedVoice.identifier, rate: 0.9 });
+    }
   };
 
   const handleFinishSession = () => {
-    // Si el usuario termina manualmente antes de tiempo, guardamos lo que hizo
-    if (!isFinished && activeExercise && activeExercise.ejercicio) {
-      const durationReal = activeExercise.ejercicio.duracionSegundos - timeLeft;
-      if (durationReal > 5) { // Solo si hizo al menos 5 segundos
-        registrarActividad({ 
-          ejercicioId: activeExercise.ejercicio_id, 
-          duracionSegundos: durationReal 
-        });
-      }
+    Speech.stop();
+    setSessionActive(false);
+    setIsResting(false);
+    setIsPaused(false);
+
+    // Regla de negocio: Solo registrar si se hizo al menos 1 minuto (60s)
+    // a menos que la sesión total configurada sea menor a 1 minuto.
+    const totalConfiguredSeconds = (configMins * 60 + configSecs) * configSesiones;
+    const minimumRequired = Math.min(60, totalConfiguredSeconds);
+
+    if (totalActiveSeconds < minimumRequired) {
+      showToast('Sesión muy corta', 'Debes realizar al menos 1 minuto para que cuente como completado.', 'info');
+      setActiveEx(null);
+      return;
     }
-    setActiveExercise(null);
-    setIsFinished(false);
-    setTimeLeft(0);
+
+    registrarActividad({
+      ejercicioId: activeEx.ejercicio_id,
+      duracionSegundos: totalActiveSeconds
+    });
+
+    // No llamamos a showToast aquí porque useRehabilitacion ya muestra uno al tener éxito
+    setActiveEx(null);
   };
 
-  if (isPacLoading || isRehabLoading || !paciente) {
-    return (
-      <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
-    );
-  }
+  const handleOpenVideoRecorder = () => {
+    if (consentAccepted) {
+      handleCaptureVideo();
+    } else {
+      setShowConsent(true);
+    }
+  };
 
-  // Vista de Reproductor de Ejercicio
-  if (activeExercise && ex) {
-    return (
-      <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
-        <StatusBar style="light" />
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={handleFinishSession}>
-            <Ionicons name="close" size={28} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.topTitle}>{ex.titulo}</Text>
-          <View style={{ width: 28 }} />
-        </View>
+  const handleAcceptConsent = async (dontShowAgain: boolean) => {
+    if (dontShowAgain) {
+      try {
+        await SecureStore.setItemAsync('rehab_consent_accepted', 'true');
+        setConsentAccepted(true);
+      } catch (e) {
+        console.error("Error al guardar consentimiento:", e);
+      }
+    }
+    setShowConsent(false);
+    // Pequeño delay para que el modal se cierre completamente antes de abrir la cámara
+    setTimeout(() => {
+      handleCaptureVideo();
+    }, 300);
+  };
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <View style={[styles.videoCard, { backgroundColor: 'transparent', borderColor: ex.color + '30', borderWidth: 1 }]}>
-            <EjercicioAnimacion ex={ex} />
-            {(!ex.id?.includes('ranita') && !ex.videoLocal) && (
-              <View style={styles.fallbackMedia}>
-                <Ionicons name={ex.icon} size={80} color={ex.color} />
-                <Text style={styles.videoText}>{ex.subtitulo}</Text>
-              </View>
-            )}
-          </View>
+  const handleCaptureVideo = () => {
+    // Abrimos nuestra pantalla de grabación propia (no usa expo-image-picker)
+    setShowVideoRecorder(true);
+  };
 
-          <View style={styles.timerContainer}>
-            <View style={[styles.timerCircle, { borderColor: ex.color + '20', borderTopColor: ex.color }]}>
-              <Text style={styles.timerNumber}>{timeLeft}</Text>
-              <Text style={styles.timerLabel}>Segundos</Text>
-            </View>
-            
-            {!isFinished ? (
-              <PrimaryButton 
-                title={sessionActive ? 'Pausar' : 'Reanudar'}
-                onPress={() => setSessionActive(!sessionActive)}
-                style={[styles.mainBtn, { backgroundColor: ex.color }]}
-                icon={sessionActive ? 'pause' : 'play'}
-              />
-            ) : (
-              <PrimaryButton 
-                title="Siguiente / Terminar"
-                onPress={handleFinishSession}
-                style={[styles.mainBtn, { backgroundColor: Colors.statusNormal }]}
-                icon="checkmark-done"
-              />
-            )}
-          </View>
+  const handleVideoRecorded = (uri: string) => {
+    setShowVideoRecorder(false);
+    if (uri && activeEx) {
+      // activeEx.id es el UUID de la prescripción — lo que la tabla espera
+      uploadVideo(uri, activeEx.id, setIsUploading);
+      setActiveEx(null);
+    }
+  };
 
-          <Text style={styles.sectionTitle}>Cómo realizarlo</Text>
-          <GlassContainer style={styles.instructionCard}>
-            {ex.instrucciones.map((step, index) => (
-              <View key={index} style={styles.step}>
-                <View style={[styles.stepNum, { backgroundColor: ex.color }]}>
-                  <Text style={styles.stepNumText}>{index + 1}</Text>
-                </View>
-                <Text style={styles.stepText}>{step}</Text>
-              </View>
-            ))}
-          </GlassContainer>
-        </ScrollView>
-      </LinearGradient>
-    );
-  }
+  if (!pacienteId) return <View style={styles.center}><Text style={{color: '#FFF'}}>No se seleccionó ningún paciente</Text></View>;
+  if (isRehabLoading || !paciente) return <View style={styles.center}><Text style={{color: '#FFF'}}>{Texts.common.loading}</Text></View>;
 
-  // Vista de Lista de Ejercicios del Día
   return (
-    <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
+    <LinearGradient colors={['#090D1F', '#1A1B35']} style={styles.gradient}>
       <StatusBar style="light" />
+      
+      {/* Header Fijo */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => {
-          router.replace('/(tabs)/progreso');
-        }}>
-          <Ionicons name="arrow-back" size={28} color="#FFF" />
+        <TouchableOpacity
+          style={styles.backBtn}
+          activeOpacity={0.7}
+          onPress={() => {
+            Speech.stop();
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/progreso');
+            }
+          }}
+        >
+          <Ionicons name="chevron-back" size={28} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.topTitle}>Plan de Hoy</Text>
-        <View style={{ width: 28 }} />
+
+        <Text style={styles.topTitle}>Mi Rehabilitación</Text>
+
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <TouchableOpacity 
+            style={styles.secondaryBtn} 
+            onPress={() => {
+              if (!isMuted) Speech.stop();
+              setIsMuted(!isMuted);
+            }}
+          >
+            <Ionicons 
+              name={isMuted ? "volume-mute-outline" : "volume-high-outline"} 
+              size={20} 
+              color={isMuted ? Colors.accent : Colors.primary} 
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.secondaryBtn}
+            onPress={() => router.push({ pathname: '/evolucion', params: { pacienteId } })}
+          >
+            <Ionicons name="stats-chart" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity 
-          style={styles.babyHeader}
-          onPress={() => router.push({ pathname: '/(tabs)/paciente-detalle', params: { id: paciente.id } })}
-        >
-          <View style={styles.avatarMini}>
-            <Text style={styles.avatarMiniText}>{paciente.nombreCompleto[0] || 'B'}</Text>
-          </View>
-          <View>
-            <Text style={styles.babyName}>{paciente.nombreCompleto}</Text>
-            <Text style={styles.instruction}>Rutina prescrita por tu médico</Text>
-          </View>
-        </TouchableOpacity>
+        {!activeEx ? (
+          <>
+            {/* Cabecera del Bebé Dinámica */}
+            <View style={styles.babyHeader}>
+              <View style={styles.avatarMini}>
+                <Text style={styles.avatarMiniText}>
+                  {paciente.nombreCompleto?.charAt(0).toUpperCase() || 'B'}
+                </Text>
+              </View>
+              <View>
+                <Text style={styles.babyName}>{paciente.nombreCompleto}</Text>
+                <Text style={styles.instruction}>ID: {paciente.codigoPaciente}</Text>
+              </View>
+            </View>
 
-        {(prescripciones || []).length > 0 ? (
-          (prescripciones || []).map((p: any) => (
-            <TouchableOpacity key={p.id} onPress={() => handleStartExercise(p)} activeOpacity={0.9}>
-              <GlassContainer style={styles.exerciseListItem}>
-                <View style={[styles.exIconContainer, { backgroundColor: p.ejercicio?.color + '15' }]}>
-                  <Ionicons name={p.ejercicio?.icon || 'fitness'} size={28} color={p.ejercicio?.color || Colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.exTitle}>{p.ejercicio?.titulo || 'Ejercicio'}</Text>
-                  <Text style={styles.exSub}>{p.ejercicio?.subtitulo || 'Rehabilitación'}</Text>
-                  <View style={styles.badgeRow}>
-                    <View style={styles.badge}>
-                      <Ionicons name="repeat" size={12} color={Colors.textSecondary} />
-                      <Text style={styles.badgeText}>{p.frecuencia_diaria || 1} veces/día</Text>
-                    </View>
-                  </View>
-                </View>
-                <Ionicons name="play-circle" size={40} color={Colors.primary} />
-              </GlassContainer>
+            {/* Selector de Voz Modular */}
+            <VoiceSelector 
+              availableVoices={availableVoices}
+              selectedVoice={selectedVoice}
+              onSelectVoice={setSelectedVoice}
+            />
+
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Ejercicios de hoy</Text>
+              <View style={styles.infoBadge}>
+                <Text style={styles.infoBadgeText}>{prescripciones?.length || 0} ASIGNADOS</Text>
+              </View>
+            </View>
+
+            {prescripciones?.map((item: any) => (
+              <EjercicioListItem 
+                key={item.id}
+                prescripcion={item}
+                onPress={() => setActiveEx(item)}
+                seguimiento={seguimientos?.[item.ejercicio_id]}
+              />
+            ))}
+          </>
+        ) : !sessionActive ? (
+          /* VISTA DE PREVISIÓN DEL EJERCICIO */
+          <View style={{ gap: 20 }}>
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}
+              onPress={() => {
+                Speech.stop();
+                setActiveEx(null);
+              }}
+            >
+              <Ionicons name="arrow-back" size={20} color={Colors.textSecondary} />
+              <Text style={{ color: Colors.textSecondary, marginLeft: 8 }}>Volver a la lista</Text>
             </TouchableOpacity>
-          ))
+
+            <View style={styles.activeHeader}>
+              <Text style={styles.activeTitle}>{activeEx?.ejercicio.nombre}</Text>
+              <Text style={[styles.activeSub, { color: Colors.textSecondary }]}>
+                Frecuencia: {activeEx?.frecuencia} veces por semana
+              </Text>
+            </View>
+
+            <View style={styles.videoCard}>
+              <EjercicioAnimacion ex={activeEx?.ejercicio} />
+            </View>
+
+            <Text style={{ color: Colors.textSecondary, fontSize: 14, lineHeight: 22, paddingHorizontal: 10 }}>
+              {activeEx?.ejercicio.descripcion}
+            </Text>
+
+            <PrimaryButton 
+              title="Configurar Sesión"
+              onPress={() => setShowConfig(true)}
+              style={styles.mainBtn}
+              icon="time-outline"
+            />
+
+            {/* Botón de video opcional — discreto y sin presión */}
+            <TouchableOpacity style={styles.videoBtn} onPress={handleOpenVideoRecorder}>
+              <Ionicons name="videocam-outline" size={20} color={Colors.textSecondary} />
+              <View>
+                <Text style={[styles.videoBtnText, { color: Colors.textSecondary }]}>Grabar video para el médico</Text>
+                <Text style={{ color: Colors.textMuted, fontSize: 11 }}>Opcional • Solo las primeras veces</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         ) : (
-          <GlassContainer style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>No tienes ejercicios asignados para hoy.</Text>
-          </GlassContainer>
+          /* VISTA ACTIVA DEL EJERCICIO */
+          <View style={{ gap: 20 }}>
+            <View style={styles.activeHeader}>
+              <Text style={styles.activeTitle}>{activeEx?.ejercicio.nombre}</Text>
+              <Text style={[styles.activeSub, { color: isResting ? Colors.accent : Colors.primary }]}>
+                {isResting 
+                  ? `DESCANSO • ${configRestMins}m ${configRestSecs}s`
+                  : `Sesión ${currentSerie} de ${configSesiones} • Tiempo ${configMins}m ${configSecs}s`
+                }
+              </Text>
+            </View>
+
+            <View style={styles.videoCard}>
+              <EjercicioAnimacion ex={activeEx?.ejercicio} />
+            </View>
+
+            <View style={styles.timerContainer}>
+              <TimerProgress 
+                timeLeft={seconds} 
+                totalTime={isResting 
+                  ? (configRestMins * 60 + configRestSecs || 30)
+                  : (configMins * 60 + configSecs || 60)
+                } 
+                color={isResting ? Colors.accent : Colors.primary}
+                countdown={null}
+              />
+            </View>
+
+            <View style={{ alignItems: 'center' }}>
+              <PrimaryButton 
+                title={isPaused ? "Reanudar" : "Pausar Sesión"}
+                onPress={() => {
+                  if (!isPaused) Speech.stop();
+                  setIsPaused(!isPaused);
+                }}
+                style={styles.mainBtn}
+                icon={isPaused ? "play" : "pause"}
+              />
+              <TouchableOpacity style={styles.videoBtn} onPress={handleFinishSession}>
+                <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+                <Text style={[styles.videoBtnText, { color: Colors.primary }]}>Finalizar Sesión</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </ScrollView>
+
+      {/* Modales Modulares */}
+      <ConfigEjercicioModal 
+        visible={showConfig}
+        ejercicioName={activeEx?.ejercicio.nombre}
+        sesiones={configSesiones}
+        setSesiones={setConfigSesiones}
+        mins={configMins}
+        setMins={setConfigMins}
+        secs={configSecs}
+        setSecs={setConfigSecs}
+        restMins={configRestMins}
+        setRestMins={setConfigRestMins}
+        restSecs={configRestSecs}
+        setRestSecs={setConfigRestSecs}
+        totalTime={configSesiones * (configMins * 60 + configSecs)}
+        onClose={() => setShowConfig(false)}
+        onStart={handleStartSession}
+      />
+
+      <ConsentimientoLegalModal 
+        visible={showConsent}
+        onAccept={handleAcceptConsent}
+        onCancel={() => {
+          setShowConsent(false);
+          setActiveEx(null);
+        }}
+      />
+
+      <VideoRecorderScreen
+        visible={showVideoRecorder}
+        maxDurationSeconds={30}
+        onVideoRecorded={handleVideoRecorded}
+        onCancel={() => {
+          setShowVideoRecorder(false);
+          setActiveEx(null);
+        }}
+      />
+
+      {/* Modal de Carga (Subida de Video) */}
+      <Modal visible={isUploading} transparent>
+        <View style={styles.loadingOverlay}>
+          <GlassContainer intensity={40} style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Subiendo video...</Text>
+            <Text style={styles.loadingSub}>Esto puede tardar unos segundos</Text>
+          </GlassContainer>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
-
-

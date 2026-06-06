@@ -45,24 +45,23 @@ export const PacienteCard = ({ paciente, onPress }: PacienteCardProps) => {
             </View>
 
             {/* Tratamiento en la esquina superior derecha */}
-            {paciente.tratamientoAsignado && (
-              <View style={[
-                styles.treatmentBadgeTop, 
-                { 
-                  backgroundColor: (
-                    paciente.tratamientoAsignado === 'ejercicios' ? Colors.statusNormal :
-                    paciente.tratamientoAsignado === 'arnes' ? Colors.statusWarning :
-                    paciente.tratamientoAsignado === 'yeso' ? Colors.statusDanger :
-                    paciente.tratamientoAsignado === 'cirugia' ? Colors.statusUrgent :
-                    Colors.textMuted
-                  )
-                }
-              ]}>
-                <Text style={styles.treatmentTextTop}>
-                  {paciente.tratamientoAsignado.toUpperCase()}
-                </Text>
-              </View>
-            )}
+            {paciente.tratamientosAsignados && paciente.tratamientosAsignados.length > 0 && (() => {
+              const priority = ['cirugia', 'yeso', 'arnes', 'ejercicios', 'observacion'];
+              const primary = priority.find(t => paciente.tratamientosAsignados!.includes(t)) || paciente.tratamientosAsignados[0];
+              const color = primary === 'ejercicios' ? Colors.statusNormal
+                : primary === 'arnes' ? Colors.statusWarning
+                : primary === 'yeso' ? Colors.statusDanger
+                : primary === 'cirugia' ? Colors.statusUrgent
+                : Colors.textMuted;
+              const extra = paciente.tratamientosAsignados.length - 1;
+              return (
+                <View style={[styles.treatmentBadgeTop, { backgroundColor: color }]}>
+                  <Text style={styles.treatmentTextTop}>
+                    {primary.toUpperCase()}{extra > 0 ? ` +${extra}` : ''}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
 
           <View style={styles.dataGrid}>

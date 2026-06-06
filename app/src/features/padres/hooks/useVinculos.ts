@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vinculosService } from '../../../services/vinculos.service';
 import { useAppStore } from '../../../store/useAppStore';
 import { useToastStore } from '../../../store/useToastStore';
+import { handleError } from '../../../utils/errorHandler';
 import { supabase } from '../../../lib/supabase';
 
 export function useVinculosPadre() {
@@ -58,9 +59,7 @@ export function useVinculosPadre() {
       showToast('¡Vinculado!', `Ahora puedes ver el historial de ${paciente.nombreCompleto}`, 'success');
       queryClient.invalidateQueries({ queryKey: ['vinculos', user?.id] });
     },
-    onError: (error: any) => {
-      showToast('Error', error.message, 'error');
-    }
+    onError: (error: any) => handleError(error, 'Vinculación de QR')
   });
 
   return {

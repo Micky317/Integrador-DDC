@@ -20,6 +20,7 @@ import { useListaPacientes } from '../features/pacientes/hooks/usePacientes';
 import { Skeleton } from '../components/Skeleton';
 import { useAppStore } from '../store/useAppStore';
 import LottieView from 'lottie-react-native';
+import { Assets } from '../constants/assets';
 
 // Animacion de pulso para el icono de scan
 function usePulse() {
@@ -42,7 +43,7 @@ export default function PacientesScreen() {
 
   useEffect(() => {
     if (user?.role === 'padre') {
-      router.replace('/progreso');
+      router.replace('/(tabs)/progreso');
     }
   }, [user]);
 
@@ -209,7 +210,7 @@ export default function PacientesScreen() {
               <LottieView
                 autoPlay
                 style={{ width: 150, height: 150 }}
-                source={require('../../assets/lottie/empty-state.json')}
+                source={Assets.lottie.emptyState}
               />
               <Text style={styles.emptyText}>Sin pacientes todavía</Text>
             </View>

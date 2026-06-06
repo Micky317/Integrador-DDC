@@ -59,15 +59,23 @@ export default function TabsLayout() {
         name="pacientes"
         options={{
           title: 'Pacientes',
-          href: isMedico ? '/pacientes' : null,
+          href: isMedico ? '/(tabs)/pacientes' : null,
           tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="cargar-imagen"
         options={{
-          href: isMedico ? '/cargar-imagen' : null,
+          href: isMedico ? '/(tabs)/cargar-imagen' : null,
           tabBarIcon: ({ focused }) => <TabIcon name="scan" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="estadisticas"
+        options={{
+          title: 'Analítica',
+          href: isMedico ? '/(tabs)/estadisticas' : null,
+          tabBarIcon: ({ focused }) => <TabIcon name="stats-chart" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -86,19 +94,12 @@ export default function TabsLayout() {
         name="paciente-detalle"
         options={{ href: null }}
       />
-      <Tabs.Screen
-        name="rehabilitacion"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="evolucion"
-        options={{ href: null }}
-      />
+
       <Tabs.Screen
         name="progreso"
         options={{
           title: 'Resultados',
-          href: !isMedico ? '/progreso' : null,
+          href: !isMedico ? '/(tabs)/progreso' : null,
           tabBarIcon: ({ focused }) => <TabIcon name="document-text" focused={focused} />,
         }}
       />

@@ -8,7 +8,8 @@ import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 import { AppInput } from '../components/AppInput';
 import { SectionTitle, AntecedentRow } from '../features/pacientes/components/FormAtoms';
 import QRCode from 'react-native-qrcode-svg';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useNuevoPaciente } from '../features/pacientes/hooks/useNuevoPaciente';
 import { PrimaryButton } from '../components/PrimaryButton';
 
@@ -20,25 +21,29 @@ export default function NuevoPacienteScreen() {
     if (!state.successData || !qrRef.current) return;
     
     try {
-      qrRef.current.toDataURL(async (base64Data: string) => {
-        const tempUri = FileSystem.cacheDirectory + `DDC-${state.successData?.codigo}.png`;
+      qrRef.current.toDataURL(async (data: string) => {
+        // Eliminar el encabezado data:image/png;base64, para que FileSystem lo entienda
+        const base64Data = data.replace(/^data:image\/png;base64,/, '');
+        const tempUri = `${FileSystem.cacheDirectory}DDC-${state.successData?.codigo}.png`;
         
-        await FileSystem.writeAsStringAsync(tempUri, base64Data, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
+        try {
+          await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+            encoding: 'base64',
+          });
 
-        // Intentar usar Sharing de Expo para que abra WhatsApp con la Imagen
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(tempUri, {
-            mimeType: 'image/png',
-            dialogTitle: 'Compartir Código del Paciente',
-            UTI: 'public.png' // iOS
-          });
-        } else {
-          // Fallback por si la imagen no se puede compartir
-          await Share.share({
-            message: `¡Hola! Descarga la app DDC Pasitos Firmes y usa este código para ver los resultados de tu bebé: ${state.successData?.codigo}`,
-          });
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(tempUri, {
+              mimeType: 'image/png',
+              dialogTitle: 'Compartir Código del Paciente',
+              UTI: 'public.png'
+            });
+          } else {
+            await Share.share({
+              message: `¡Hola! Descarga la app DDC Pasitos Firmes y usa este código para ver los resultados de tu bebé: ${state.successData?.codigo}`,
+            });
+          }
+        } catch (err) {
+          console.error("FileSystem Error:", err);
         }
       });
     } catch (error) {
@@ -153,7 +158,7 @@ export default function NuevoPacienteScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Ionicons name="checkmark-circle" size={48} color={Colors.statusSuccess} style={{ alignSelf: 'center', marginBottom: 12 }} />
+            <Ionicons name="checkmark-circle" size={48} color={Colors.statusNormal} style={{ alignSelf: 'center', marginBottom: 12 }} />
             <Text style={styles.modalTitle}>¡Paciente Registrado!</Text>
             <Text style={styles.modalDesc}>
               Papá o mamá puede escanear este código QR para vincularse al expediente médico.

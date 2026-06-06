@@ -17,7 +17,7 @@ const mapPaciente = (p: any): Paciente => ({
   estadoGraf: p.estado_graf,
   ultimaRevision: p.ultima_revision,
   proximaRevision: p.proxima_revision,
-  tratamientoAsignado: p.tratamiento_asignado,
+  tratamientosAsignados: p.tratamientos_asignados || [],
 });
 
 export const pacientesService = {
@@ -77,10 +77,10 @@ export const pacientesService = {
   /**
    * Actualiza el tratamiento asignado
    */
-  async updateTratamiento(pacienteId: string, tratamiento: string): Promise<void> {
+  async updateTratamiento(pacienteId: string, tratamientos: string[]): Promise<void> {
     const { error } = await supabase
       .from('pacientes')
-      .update({ tratamiento_asignado: tratamiento })
+      .update({ tratamientos_asignados: tratamientos })
       .eq('id', pacienteId);
 
     if (error) throw error;

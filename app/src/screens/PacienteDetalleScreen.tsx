@@ -10,14 +10,18 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { GrafBadge } from '../components/GrafBadge';
 import { Skeleton } from '../components/Skeleton';
 import { AnalisisHistorialCard } from '../features/pacientes/components/AnalisisHistorialCard';
+import { RevisionVideoModal } from '../features/rehabilitacion/components/RevisionVideoModal';
+import { PrescripcionCard } from '../features/prescripcion/components/PrescripcionCard';
+import { NuevaPrescripcionModal } from '../features/prescripcion/components/NuevaPrescripcionModal';
 import { usePacienteDetalle, useEliminarPaciente, useActualizarTratamiento } from '../features/pacientes/hooks/usePacienteDetalle';
 import { useVinculosPadre } from '../features/padres/hooks/useVinculos';
 import { useRehabilitacion } from '../features/rehabilitacion/hooks/useRehabilitacion';
+import { usePrescripcion } from '../features/prescripcion/hooks/usePrescripcion';
 import { CATALOGO_EJERCICIOS } from '../constants/ejercicios';
 import { calcularMesesDeEdad, obtenerIniciales, obtenerColorAvatar } from '../utils/helpers';
 import { useAppStore } from '../store/useAppStore';
+import { supabase } from '../lib/supabase';
 
-// Configuración de Planes de Tratamiento (Fuera del componente para orden)
 const PLANES_CONFIG = [
   { id: 'ejercicios', label: 'Ejercicios y Masajes', icon: 'fitness-outline' as const, color: Colors.statusNormal, desc: 'Protocolo de abducciones y masajes diarios.' },
   { id: 'arnes', label: 'Arnés de Pavlik', icon: 'ribbon-outline' as const, color: Colors.statusWarning, desc: 'Uso de órtesis dinámica activa.' },
@@ -26,6 +30,8 @@ const PLANES_CONFIG = [
   { id: 'observacion', label: 'Observación Controlada', icon: 'eye-outline' as const, color: Colors.textMuted, desc: 'Sin tratamiento activo por ahora.' },
 ];
 
+const PRIORITY_ORDER = ['cirugia', 'yeso', 'arnes', 'ejercicios', 'observacion'];
+
 export default function PacienteDetalleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAppStore();
@@ -33,18 +39,44 @@ export default function PacienteDetalleScreen() {
   const { misBebes } = useVinculosPadre(); 
   
   // Hook de Rehabilitación
-  const { 
-    prescripciones, 
-    isLoading: isRehabLoading, 
-    prescribir, 
-    eliminarPrescripcion 
+  const {
+    prescripciones: ejerciciosPrescritos,
+    seguimientos,
+    seguimientosFullList,
+    isLoading: isRehabLoading,
+    prescribir,
+    eliminarPrescripcion,
+    evaluarVideo,
+    eliminarSeguimiento
   } = useRehabilitacion(id ?? '');
+
+  const { prescripciones, isLoading: isPrescLoading, crear: crearPrescripcion, isCreating, eliminar: eliminarPrescripcionMedica } = usePrescripcion(id ?? '');
 
   const { mutate: eliminar } = useEliminarPaciente(id ?? '');
   const { mutate: actualizarTratamiento } = useActualizarTratamiento(id ?? '');
-  
+
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showRehabModal, setShowRehabModal] = useState(false);
+  const [showPrescripcionModal, setShowPrescripcionModal] = useState(false);
+  const [tempTratamientos, setTempTratamientos] = useState<string[]>([]);
+
+  const handleOpenPlanModal = () => {
+    setTempTratamientos(paciente?.tratamientosAsignados || []);
+    setShowPlanModal(true);
+  };
+
+  const toggleTratamiento = (id: string) => {
+    setTempTratamientos(prev =>
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
+  };
+
+  const handleSaveTratamientos = () => {
+    actualizarTratamiento(tempTratamientos);
+    setShowPlanModal(false);
+  };
+  const [expandedExercise, setExpandedExercise] = useState<string | null>(null); // Para desplegar historial
+  const [selectedVideo, setSelectedVideo] = useState<{ url: string; ejercicioId: string; ejercicioNombre: string } | null>(null);
 
   const isMedico = user?.role === 'medico';
 
@@ -52,7 +84,7 @@ export default function PacienteDetalleScreen() {
 
   const handleNuevoAnalisis = () => router.push({ pathname: '/(tabs)/cargar-imagen', params: { pacienteId: id } });
 
-  const handleVerEvolucion = () => router.push({ pathname: '/(tabs)/evolucion', params: { pacienteId: id } });
+  const handleVerEvolucion = () => router.push({ pathname: '/evolucion', params: { pacienteId: id } });
 
   const handleSwitchSibling = (siblingId: string) => {
     router.setParams({ id: siblingId }); // Navegación instantánea entre hermanos
@@ -65,6 +97,13 @@ export default function PacienteDetalleScreen() {
     ]);
   };
 
+  const handleConfirmDeleteVideo = (segId: string, path: string) => {
+    Alert.alert('Eliminar video', '¿Estás seguro de eliminar este registro y su video permanentemente?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: () => eliminarSeguimiento({ id: segId, videoPath: path }) },
+    ]);
+  };
+
   if (isLoading || !paciente) {
     return (
       <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
@@ -73,14 +112,17 @@ export default function PacienteDetalleScreen() {
     );
   }
 
-  const planActual = PLANES_CONFIG.find(p => p.id === paciente?.tratamientoAsignado) || PLANES_CONFIG[4];
+  const currentTratamientos = paciente?.tratamientosAsignados || [];
+  const primaryId = PRIORITY_ORDER.find(t => currentTratamientos.includes(t)) || 'observacion';
+  const planActual = PLANES_CONFIG.find(p => p.id === primaryId) || PLANES_CONFIG[4];
+  const extraCount = Math.max(0, currentTratamientos.length - 1);
   const colorBebé = obtenerColorAvatar(paciente.id);
 
   return (
     <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
       <StatusBar style="light" />
 
-      {/* Top Bar + Sibling Selector */}
+      {/* ... (Header y Hero Profile omitidos por brevedad, mantenemos el resto igual) */}
       <View style={styles.headerContainer}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
@@ -155,18 +197,37 @@ export default function PacienteDetalleScreen() {
           <Text style={styles.sectionTitle}>
             {isMedico ? 'Plan de Acción Médico' : 'Indicación Médica'}
           </Text>
-          <TouchableOpacity disabled={!isMedico} onPress={() => setShowPlanModal(true)}>
+          <TouchableOpacity disabled={!isMedico} onPress={handleOpenPlanModal} activeOpacity={0.85}>
             <GlassContainer intensity={20} style={[styles.planCard, { borderColor: planActual.color + '40', borderWidth: 1 }]}>
-              <View style={[styles.planIconBg, { backgroundColor: planActual.color + '20' }]}>
-                <Ionicons name={planActual.icon} size={24} color={planActual.color} />
+              {/* Fila superior: ícono principal + título + flecha */}
+              <View style={styles.planCardHeader}>
+                <View style={[styles.planIconBg, { backgroundColor: planActual.color + '20' }]}>
+                  <Ionicons name={planActual.icon} size={24} color={planActual.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.planLabel, { color: planActual.color }]}>{planActual.label}</Text>
+                  <Text style={styles.planDesc} numberOfLines={1}>{planActual.desc}</Text>
+                </View>
+                {isMedico && <Ionicons name="create-outline" size={18} color={Colors.textMuted} />}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.planLabel, { color: planActual.color }]}>{planActual.label}</Text>
-                <Text style={styles.planDesc}>
-                  {isMedico ? planActual.desc : `Tu médico ha prescrito: ${planActual.desc}`}
-                </Text>
-              </View>
-              {isMedico && <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />}
+
+              {/* Tratamientos adicionales como chips */}
+              {currentTratamientos.length > 1 && (
+                <View style={styles.planChipsRow}>
+                  {currentTratamientos
+                    .filter(t => t !== primaryId)
+                    .map(tid => {
+                      const plan = PLANES_CONFIG.find(p => p.id === tid);
+                      if (!plan) return null;
+                      return (
+                        <View key={tid} style={[styles.planChip, { borderColor: plan.color + '60', backgroundColor: plan.color + '12' }]}>
+                          <Ionicons name={plan.icon} size={12} color={plan.color} />
+                          <Text style={[styles.planChipText, { color: plan.color }]}>{plan.label}</Text>
+                        </View>
+                      );
+                    })}
+                </View>
+              )}
             </GlassContainer>
           </TouchableOpacity>
 
@@ -179,12 +240,12 @@ export default function PacienteDetalleScreen() {
                 style={{ flex: 1.5 }} 
               />
             ) : (
-              paciente.tratamientoAsignado === 'ejercicios' ? (
-                <PrimaryButton 
-                  title="Rehabilitación" 
-                  onPress={() => router.push({ pathname: '/(tabs)/rehabilitacion', params: { id: paciente.id } })} 
+              paciente.tratamientosAsignados?.includes('ejercicios') ? (
+                <PrimaryButton
+                  title="Rehabilitación"
+                  onPress={() => router.push({ pathname: '/rehabilitacion', params: { id: paciente.id } })}
                   icon="play-circle"
-                  style={{ flex: 2, backgroundColor: Colors.statusNormal }} 
+                  style={{ flex: 2, backgroundColor: Colors.statusNormal }}
                 />
               ) : null
             )}
@@ -194,7 +255,7 @@ export default function PacienteDetalleScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Sección de Rehabilitación Física (Nueva Parte) */}
+          {/* Sección de Rehabilitación Física */}
           <View style={styles.rehabContainer}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Plan de Rehabilitación</Text>
@@ -208,35 +269,138 @@ export default function PacienteDetalleScreen() {
 
             {isRehabLoading ? (
               <ActivityIndicator color={Colors.primary} style={{ marginTop: 10 }} />
-            ) : (prescripciones || []).length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rehabScroll}>
-                {(prescripciones || []).map((p: any) => (
-                  <View key={p.id} style={styles.rehabItem}>
-                    <GlassContainer style={styles.rehabCard}>
-                      <View style={[styles.rehabIconBg, { backgroundColor: p.ejercicio?.color + '20' }]}>
-                        <Ionicons name={p.ejercicio?.icon} size={20} color={p.ejercicio?.color} />
-                      </View>
-                      <Text style={styles.rehabTitle} numberOfLines={1}>{p.ejercicio?.titulo || 'Ejercicio'}</Text>
-                      <Text style={styles.rehabFreq}>{p.frecuencia_diaria} veces/día</Text>
-                      {isMedico && (
-                        <TouchableOpacity 
-                          style={styles.removeBtn}
-                          onPress={() => p.id && eliminarPrescripcion(p.id)}
-                        >
-                          <Ionicons name="close-circle" size={18} color={Colors.statusDanger} />
-                        </TouchableOpacity>
+            ) : (ejerciciosPrescritos || []).length > 0 ? (
+              <View style={styles.rehabListVertical}>
+                  {(ejerciciosPrescritos || []).map((p: any) => {
+                    // Buscar el último seguimiento para el badge de estado general
+                    const ultimoSeguimiento = seguimientos ? (seguimientos[p.id] || seguimientos[p.ejercicio_id]) : null;
+                    const isApproved = ultimoSeguimiento?.estado === 'Aprobado';
+                    const isPending = ultimoSeguimiento?.estado === 'En revisión';
+                    const isExpanded = expandedExercise === p.id;
+
+                    // Mostramos todos los seguimientos con video del paciente
+                    const historialDeEsteEjercicio = (seguimientosFullList || []).filter(
+                      (s: any) => !!s.video_url
+                    );
+
+                  return (
+                    <GlassContainer key={p.id} style={[styles.rehabCardVertical, isExpanded && { borderColor: Colors.primary + '40', borderWidth: 1 }]}>
+                      <TouchableOpacity 
+                        style={styles.rehabHeader}
+                        onPress={() => setExpandedExercise(isExpanded ? null : p.id)}
+                      >
+                        <View style={[styles.rehabIconBg, { backgroundColor: p.ejercicio?.color + '20' }]}>
+                          <Ionicons name={p.ejercicio?.icon} size={20} color={p.ejercicio?.color} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                          <Text style={styles.rehabTitle}>{p.ejercicio?.titulo || 'Ejercicio'}</Text>
+                          <Text style={styles.rehabFreq}>{p.frecuencia_diaria} veces al día</Text>
+                        </View>
+                        
+                        {/* Badge de Estado General */}
+                        {ultimoSeguimiento && (
+                          <View style={[styles.statusBadge, { backgroundColor: isApproved ? 'rgba(16, 185, 129, 0.15)' : isPending ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 71, 87, 0.15)' }]}>
+                            <Text style={[styles.statusBadgeText, { color: isApproved ? "#10B981" : isPending ? "#F59E0B" : "#FF4757" }]}>
+                              {ultimoSeguimiento.estado}
+                            </Text>
+                          </View>
+                        )}
+
+                        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textMuted} style={{ marginLeft: 8 }} />
+                      </TouchableOpacity>
+
+                      {/* Lista de Intentos (Videos) - SOLO SE VE SI ESTÁ EXPANDIDO */}
+                      {isExpanded && (
+                        <View style={styles.intentosContainer}>
+                          {historialDeEsteEjercicio.length > 0 ? (
+                            <>
+                              <Text style={styles.intentosLabel}>Historial de Videos ({historialDeEsteEjercicio.length})</Text>
+                              {historialDeEsteEjercicio.map((seg: any) => {
+                                const fecha = new Date(seg.creado_en).toLocaleDateString();
+                                return (
+                                  <View key={seg.id} style={styles.intentoItem}>
+                                    <View style={styles.intentoMain}>
+                                      <View style={[styles.intentoDot, { backgroundColor: seg.estado === 'Aprobado' ? '#10B981' : seg.estado === 'En revisión' ? '#F59E0B' : '#FF4757' }]} />
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={styles.intentoMeta}>{fecha} · <Text style={{ fontWeight: 'bold' }}>{seg.estado}</Text></Text>
+                                        {seg.comentarios_medico && (
+                                          <Text style={styles.intentoComment} numberOfLines={1}>"{seg.comentarios_medico}"</Text>
+                                        )}
+                                      </View>
+                                    </View>
+                                    
+                                    <View style={styles.intentoActions}>
+                                      <TouchableOpacity 
+                                        onPress={() => {
+                                          const { data } = supabase.storage.from('ejercicios_videos').getPublicUrl(seg.video_url);
+                                          setSelectedVideo({ 
+                                            url: data.publicUrl, 
+                                            ejercicioId: p.id, 
+                                            ejercicioNombre: p.ejercicio?.titulo || 'Ejercicio' 
+                                          });
+                                        }}
+                                        style={styles.intentoPlayBtn}
+                                      >
+                                        <Ionicons name="play" size={16} color={Colors.primary} />
+                                      </TouchableOpacity>
+
+                                      {isMedico && (
+                                        <TouchableOpacity 
+                                          onPress={() => handleConfirmDeleteVideo(seg.id, seg.video_url)}
+                                          style={styles.intentoDeleteBtn}
+                                        >
+                                          <Ionicons name="trash-outline" size={16} color={Colors.statusDanger} />
+                                        </TouchableOpacity>
+                                      )}
+                                    </View>
+                                  </View>
+                                );
+                              })}
+                            </>
+                          ) : (
+                            <Text style={styles.sinIntentosText}>Sin videos enviados aún.</Text>
+                          )}
+                        </View>
                       )}
                     </GlassContainer>
-                  </View>
-                ))}
-              </ScrollView>
+                  );
+                })}
+              </View>
             ) : (
               <Text style={styles.emptyRehabText}>No hay ejercicios asignados.</Text>
             )}
           </View>
 
-          {/* Historial */}
-          <Text style={styles.sectionTitle}>Análisis Realizados ({(historial || []).length})</Text>
+          {/* Prescripciones Médicas */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Prescripciones Médicas ({prescripciones.length})</Text>
+            {isMedico && (
+              <TouchableOpacity style={styles.addExerciseBtn} onPress={() => setShowPrescripcionModal(true)}>
+                <Ionicons name="add" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          {isPrescLoading ? (
+            <Skeleton height={72} style={{ marginBottom: Spacing.sm }} />
+          ) : prescripciones.length > 0 ? (
+            prescripciones.map(p => (
+              <PrescripcionCard
+                key={p.id}
+                prescripcion={p}
+                isMedico={isMedico}
+                onEliminar={(pid) => eliminarPrescripcionMedica(pid)}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyActivityText}>
+                {isMedico ? 'Emití la primera prescripción con el botón +' : 'No hay prescripciones emitidas aún.'}
+              </Text>
+            </View>
+          )}
+
+          {/* Historial de Análisis */}
+          <Text style={styles.sectionTitle}>Análisis de Radiografías ({(historial || []).length})</Text>
           {(historial || []).length > 0 ? (
             (historial || []).map(a => (
               <AnalisisHistorialCard 
@@ -269,21 +433,34 @@ export default function PacienteDetalleScreen() {
                 </View>
                 
                 <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
-                  {PLANES_CONFIG.map(plan => (
-                    <TouchableOpacity 
-                      key={plan.id} 
-                      style={styles.planOption} 
-                      onPress={() => { actualizarTratamiento(plan.id); setShowPlanModal(false); }}
-                    >
-                      <View style={[styles.planIconBgSmall, { backgroundColor: plan.color + '20' }]}>
-                        <Ionicons name={plan.icon} size={20} color={plan.color} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.planOptionLabel, { color: plan.color }]}>{plan.label}</Text>
-                        <Text style={styles.planOptionDesc} numberOfLines={1}>{plan.desc}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  {PLANES_CONFIG.map(plan => {
+                    const isSelected = tempTratamientos.includes(plan.id);
+                    return (
+                      <TouchableOpacity
+                        key={plan.id}
+                        style={[styles.planOption, isSelected && { borderColor: plan.color + '80', borderWidth: 1 }]}
+                        onPress={() => toggleTratamiento(plan.id)}
+                      >
+                        <View style={[styles.planIconBgSmall, { backgroundColor: plan.color + '20' }]}>
+                          <Ionicons name={plan.icon} size={20} color={plan.color} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.planOptionLabel, { color: plan.color }]}>{plan.label}</Text>
+                          <Text style={styles.planOptionDesc} numberOfLines={1}>{plan.desc}</Text>
+                        </View>
+                        <Ionicons
+                          name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={24}
+                          color={isSelected ? plan.color : Colors.textMuted}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <PrimaryButton
+                    title="Guardar Tratamiento"
+                    onPress={handleSaveTratamientos}
+                    style={{ marginTop: Spacing.md }}
+                  />
                 </ScrollView>
               </GlassContainer>
             </TouchableOpacity>
@@ -330,6 +507,41 @@ export default function PacienteDetalleScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
+
+        {/* Modal de Revisión de Video del Doctor */}
+        {selectedVideo && (
+          <RevisionVideoModal
+            visible={!!selectedVideo}
+            videoUrl={selectedVideo.url}
+            ejercicioNombre={selectedVideo.ejercicioNombre}
+            pacienteNombre={paciente.nombreCompleto}
+            onClose={() => setSelectedVideo(null)}
+            onEvaluate={async (estado, comentario) => {
+              evaluarVideo({
+                ejercicioId: selectedVideo.ejercicioId,
+                estado,
+                comentario
+              });
+            }}
+          />
+        )}
+
+        {/* Modal de Nueva Prescripción Médica */}
+        <NuevaPrescripcionModal
+          visible={showPrescripcionModal}
+          onClose={() => setShowPrescripcionModal(false)}
+          isLoading={isCreating}
+          tratamientosActuales={paciente?.tratamientosAsignados ?? []}
+          ultimoAnalisis={historial?.[0] ?? null}
+          onGuardar={(payload) => {
+            crearPrescripcion({
+              pacienteId: id ?? '',
+              medicoId: user?.id ?? '',
+              ...payload,
+            });
+            setShowPrescripcionModal(false);
+          }}
+        />
     </LinearGradient>
   );
 }
@@ -376,17 +588,25 @@ const styles = StyleSheet.create({
   rehabContainer: { marginVertical: Spacing.xs },
   rehabScroll: { gap: 12, paddingRight: 20, paddingVertical: 8 },
   rehabItem: { width: 160 },
-  rehabCard: { padding: 12, borderRadius: Radius.lg, height: 110 },
+  rehabCard: { padding: 12, borderRadius: Radius.lg, minHeight: 110, justifyContent: 'space-between' },
   rehabIconBg: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   rehabTitle: { color: '#FFF', fontSize: 14, fontWeight: '600' },
   rehabFreq: { color: Colors.textSecondary, fontSize: 12, marginTop: 2 },
   removeBtn: { position: 'absolute', top: 8, right: 8 },
   emptyRehabText: { color: Colors.textMuted, fontSize: 13, marginTop: 8, fontStyle: 'italic', marginLeft: 4 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 4, marginTop: 6 },
+  statusBadgeText: { fontSize: 10, fontWeight: 'bold' },
+  reviewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, paddingVertical: 6, borderRadius: 8, marginTop: 8, gap: 4 },
+  reviewBtnText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
 
-  planCard: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.md, borderRadius: Radius.lg },
+  planCard: { padding: Spacing.md, gap: Spacing.sm, borderRadius: Radius.lg },
+  planCardHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   planIconBg: { width: 44, height: 44, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   planLabel: { fontSize: Typography.size.base, fontFamily: Typography.fonts.bold },
   planDesc: { fontSize: Typography.size.xs, color: Colors.textSecondary, marginTop: 2 },
+  planChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 4 },
+  planChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+  planChipText: { fontSize: 11, fontFamily: Typography.fonts.medium },
   actionRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.xs },
   secondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: Colors.primary, borderRadius: Radius.lg },
   secondaryBtnText: { color: Colors.primary, fontFamily: Typography.fonts.semibold },
@@ -405,4 +625,20 @@ const styles = StyleSheet.create({
   planIconBgSmall: { width: 36, height: 36, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   planOptionLabel: { fontSize: Typography.size.md, fontFamily: Typography.fonts.semibold },
   planOptionDesc: { fontSize: Typography.size.xs, color: Colors.textMuted },
+  
+  rehabListVertical: { gap: Spacing.md },
+  rehabCardVertical: { padding: Spacing.md, borderRadius: Radius.lg },
+  rehabHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md },
+  
+  intentosContainer: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: Radius.md, padding: Spacing.sm },
+  intentosLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: 'bold', marginBottom: Spacing.xs, textTransform: 'uppercase' },
+  intentoItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.xs, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  intentoMain: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
+  intentoDot: { width: 6, height: 6, borderRadius: 3 },
+  intentoMeta: { color: '#FFF', fontSize: 12 },
+  intentoComment: { color: Colors.primary, fontSize: 11, fontStyle: 'italic' },
+  intentoActions: { flexDirection: 'row', gap: Spacing.xs },
+  intentoPlayBtn: { padding: 6 },
+  intentoDeleteBtn: { padding: 6 },
+  sinIntentosText: { color: Colors.textMuted, fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
 });

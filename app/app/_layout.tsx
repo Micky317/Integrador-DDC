@@ -46,7 +46,18 @@ export default function RootLayout() {
     async function checkUserSession() {
       if (!isMounted) return;
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          // Si el refresh token es inválido o no existe, limpiamos la sesión expirada de localstorage
+          await supabase.auth.signOut();
+          if (isMounted) {
+            setTimeout(() => {
+              router.replace('/login');
+            }, 100);
+          }
+          return;
+        }
         
         if (session) {
           const userDetails = await authService.getCurrentUser();
@@ -54,9 +65,9 @@ export default function RootLayout() {
             setUser(userDetails);
             setTimeout(() => {
               if (userDetails.role === 'medico') {
-                router.replace('/pacientes');
+                router.replace('/(tabs)/pacientes');
               } else {
-                router.replace('/progreso');
+                router.replace('/(tabs)/progreso');
               }
             }, 100);
           }
@@ -66,7 +77,13 @@ export default function RootLayout() {
           }, 100);
         }
       } catch (error) {
-        console.error(error);
+        console.warn('Error en la inicialización de sesión:', error);
+        // Redirigir al login por seguridad
+        if (isMounted) {
+          setTimeout(() => {
+            router.replace('/login');
+          }, 100);
+        }
       } finally {
         if (isMounted) setIsInitializing(false);
       }
@@ -84,9 +101,9 @@ export default function RootLayout() {
         if (userDetails && isMounted) {
           setUser(userDetails);
           if (userDetails.role === 'medico') {
-            router.replace('/pacientes');
+            router.replace('/(tabs)/pacientes');
           } else {
-            router.replace('/progreso');
+            router.replace('/(tabs)/progreso');
           }
         }
       }
@@ -119,6 +136,8 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="rehabilitacion" />
+          <Stack.Screen name="evolucion" />
         </Stack>
         <ToastContainer />
       </QueryClientProvider>

@@ -6,7 +6,28 @@ __pycache__/
 .expo/
 dist/
 
-# Large files
+# Environments and Secrets
+.env
+*.env
+.env.*
+app/.env
+backend/.env
+dashboard-web/.env
+
+# IDE and Editor files
+.vscode/
+.idea/
+
+# Agent internal configurations
+.agent/
+.claude/
+
+# Project documentation drafts and thesis logs
+# We ignore root markdown files, but allow a future standard README.md if created
+/*.md
+!/README.md
+
+# Large files and backups
 *.zip
 *.tar.gz
 *.rar
@@ -18,10 +39,18 @@ MTDDH/runs/
 *.weights
 *.h5
 
+# Datasets (large raw images for YOLOv8)
+MTDDH/Dataset1/
+MTDDH/Dataset2/
+MTDDH/yolo_dataset/
+MTDDH/.gradio/
+
 # Logs
 logs/
 *.log
+server.log
 
 # OS files
 .DS_Store
 Thumbs.db
+

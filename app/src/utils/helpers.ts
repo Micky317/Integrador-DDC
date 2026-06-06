@@ -29,3 +29,28 @@ export const obtenerColorAvatar = (id: string): string => {
   }
   return colors[numId % colors.length];
 };
+
+/**
+ * Formatea un objeto Date a string YYYY-MM-DD en la zona horaria local.
+ */
+export const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Parsea una fecha de manera segura. Si es un string de fecha simple (YYYY-MM-DD),
+ * le añade T00:00:00 para forzar la interpretación en hora local y evitar desfases horarias (timezones).
+ */
+export const parseDateSafe = (dateStr?: string | null): Date => {
+  if (!dateStr) return new Date();
+  // Si tiene formato YYYY-MM-DD exacto (10 caracteres)
+  if (dateStr.length === 10 && dateStr.includes('-')) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(dateStr);
+};
+

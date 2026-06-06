@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,13 +15,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, router } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../constants/theme';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { GlassContainer } from '../components/GlassContainer';
 import { pacientesService } from '../services/pacientes.service';
 import { styles } from './CargarImagenScreen.styles';
+import { formatLocalDate } from '../utils/helpers';
 
 type ImageSource = 'dicom' | 'galeria' | 'camara' | null;
 
@@ -30,6 +32,25 @@ export default function CargarImagenScreen() {
   const esRapido = modoRapido === '1';
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<ImageSource>(null);
+  
+  // Estado para la fecha de la placa
+  const [fechaPlaca, setFechaPlaca] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Cada vez que la pantalla gana el foco (cuando entras a hacer un nuevo análisis)
+      // reseteamos la fecha al día de hoy y vaciamos la imagen previa.
+      setFechaPlaca(new Date());
+      setImageUri(null);
+      setSelectedSource(null);
+    }, [pacienteId, ts]) // El parámetro ts (timestamp) nos ayuda a forzar reset si viene en los params
+  );
+
+  const onChangeDate = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) setFechaPlaca(selectedDate);
+  };
 
   const { data: paciente } = useQuery({
     queryKey: ['paciente', pacienteId],
@@ -76,6 +97,7 @@ export default function CargarImagenScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
+      aspect: [4, 3], // Cuadro de recorte rectangular horizontal
       quality: 0.95,
     });
     if (!result.canceled) {
@@ -91,7 +113,8 @@ export default function CargarImagenScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
+      allowsEditing: true, 
+      aspect: [4, 3], // Cuadro de recorte rectangular horizontal para evitar "rebote"
       quality: 0.95,
     });
     if (!result.canceled) {
@@ -116,6 +139,7 @@ export default function CargarImagenScreen() {
         imageUri: imageUri ?? '',
         pacienteId: pacienteId ?? '',
         modoRapido: esRapido ? '1' : '0',
+        fechaRadiografia: formatLocalDate(fechaPlaca),
       } 
     });
 
@@ -192,16 +216,47 @@ export default function CargarImagenScreen() {
 
         {/* Drop Zone / Image Preview */}
         {imageUri ? (
-          <GlassContainer intensity={30} style={styles.imagePreviewContainer}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
-            <LinearGradient 
-              colors={['transparent', 'rgba(9, 13, 31, 0.9)']} 
-              style={styles.imageOverlay}
-            >
-              <Ionicons name="checkmark-circle" size={32} color={Colors.primary} />
-              <Text style={styles.imageOverlayText}>Radiografía lista</Text>
-            </LinearGradient>
-          </GlassContainer>
+          <>
+            <GlassContainer intensity={30} style={styles.imagePreviewContainer}>
+              <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+              <LinearGradient 
+                colors={['transparent', 'rgba(9, 13, 31, 0.9)']} 
+                style={styles.imageOverlay}
+              >
+                <Ionicons name="checkmark-circle" size={32} color={Colors.primary} />
+                <Text style={styles.imageOverlayText}>Radiografía lista</Text>
+              </LinearGradient>
+            </GlassContainer>
+            
+            {/* DATE PICKER */}
+            <View style={{ backgroundColor: Colors.bgCard, borderRadius: Radius.md, padding: Spacing.md, marginTop: Spacing.sm, borderWidth: 1, borderColor: Colors.borderCard, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="calendar-outline" size={24} color={Colors.primary} />
+                <View>
+                  <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>Fecha de la Radiografía</Text>
+                  <Text style={{ color: Colors.textPrimary, fontSize: 16, fontFamily: Typography.fonts.bold }}>
+                    {fechaPlaca.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+              </View>
+              <PrimaryButton 
+                title="Cambiar" 
+                onPress={() => setShowDatePicker(true)} 
+                variant="secondary" 
+                style={{ paddingVertical: 8, paddingHorizontal: 16, minWidth: 0, minHeight: 0 }} 
+              />
+            </View>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={fechaPlaca}
+                mode="date"
+                display="default"
+                onChange={onChangeDate}
+                maximumDate={new Date()}
+              />
+            )}
+          </>
         ) : (
           <View style={styles.dropZone}>
             <Ionicons name="scan-outline" size={52} color={Colors.textMuted} />
@@ -236,11 +291,15 @@ export default function CargarImagenScreen() {
 
         {/* Guía */}
         <View style={styles.guideCard}>
-          <Ionicons name="eye-outline" size={20} color={Colors.primary} />
-          <Text style={styles.guideText}>
-            <Text style={styles.guideBold}>Guía de Captura{'\n'}</Text>
-            Asegúrese de que el ilium esté recto y el labrum sea claramente visible para el análisis.
-          </Text>
+          <Ionicons name="bulb-outline" size={24} color={Colors.primary} />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.guideBold}>Guía para una foto perfecta:</Text>
+            <Text style={styles.guideText}>
+              1. Usa tu celular en <Text style={{ fontWeight: 'bold' }}>Horizontal</Text>.{'\n'}
+              2. Asegúrate de que no haya reflejos.{'\n'}
+              3. Usa la herramienta de <Text style={{ fontWeight: 'bold' }}>Recorte</Text> que aparecerá después para encuadrar solo la placa radiográfica, eliminando bordes y enderezándola si salió chueca.
+            </Text>
+          </View>
         </View>
       </ScrollView>
 

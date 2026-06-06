@@ -1,0 +1,14 @@
+{
+    "venvPath": "/home/angel/Documentos/Universidad/integrador/MTDDH",
+    "venv": "venv",
+    "include": [
+        "backend",
+        "MTDDH"
+    ],
+    "pythonVersion": "3.12",
+    "reportMissingImports": true,
+    "analysis.extraPaths": [
+        "./backend",
+        "./MTDDH"
+    ]
+}

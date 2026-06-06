@@ -18,7 +18,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#090D1F",
-        "foregroundImage": "./assets/adaptive-icon.png"
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "package": "com.ddccheck.pasitosfirmes"
     },
@@ -27,15 +27,25 @@
     },
     "plugins": [
       "expo-router",
-      "expo-camera",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "DDC-Check necesita acceso a la cámara para grabar los ejercicios de rehabilitación.",
+          "microphonePermission": "DDC-Check necesita acceso al micrófono para el audio del video de rehabilitación."
+        }
+      ],
       [
         "expo-image-picker",
         {
           "photosPermission": "DDC-Check necesita acceso a tu galería para cargar radiografías.",
-          "cameraPermission": "DDC-Check necesita acceso a la cámara para capturar ecografías."
+          "cameraPermission": "DDC-Check necesita acceso a la cámara para capturar ecografías.",
+          "microphonePermission": "DDC-Check necesita acceso al micrófono para grabar videos de rehabilitación."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "@react-native-community/datetimepicker",
+      "expo-video",
+      "expo-audio"
     ],
     "scheme": "ddc-check"
   }

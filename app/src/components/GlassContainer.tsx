@@ -67,6 +67,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   content: {
-    padding: 0, // El padding se maneja externamente si es necesario
+    padding: 0,
   }
 });

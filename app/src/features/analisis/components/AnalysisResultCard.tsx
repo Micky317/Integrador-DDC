@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Typography, Radius, Shadow, Spacing } from '../../../constants/theme';
-import { colorPorDiagnostico, DiagnosticoCategoria } from '../../../types';
+import { colorPorDiagnostico } from '../../../constants/clinical';
+import { DiagnosticoCategoria } from '../../../types';
 
 interface AngleCardProps {
   label: string;

@@ -58,7 +58,7 @@ export function useListaPacientes() {
       if (!matchSearch) return false;
 
       const estado = p.estadoGraf || 'GRAF_I';
-      const tratamiento = p.tratamientoAsignado;
+      const tratamientos = p.tratamientosAsignados || [];
 
       switch (activeFilter) {
         case 'URGENTES':
@@ -66,13 +66,13 @@ export function useListaPacientes() {
         case 'EN_SEGUIMIENTO':
           return ['GRAF_IIA', 'GRAF_IIB'].includes(estado);
         case 'EJERCICIOS':
-          return tratamiento === 'ejercicios';
+          return tratamientos.includes('ejercicios');
         case 'ARNES':
-          return tratamiento === 'arnes';
+          return tratamientos.includes('arnes');
         case 'YESO':
-          return tratamiento === 'yeso';
+          return tratamientos.includes('yeso');
         case 'CIRUGIA':
-          return tratamiento === 'cirugia';
+          return tratamientos.includes('cirugia');
         default:
           return true;
       }
