@@ -97,11 +97,12 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.modalContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-        <LinearGradient colors={['#1A2035', '#0D1225']} style={styles.sheet}>
+        <View style={styles.modalContainer}>
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+          <LinearGradient colors={['#1A2035', '#0D1225']} style={styles.sheet}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -202,8 +203,9 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
             />
           </ScrollView>
         </LinearGradient>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </KeyboardAvoidingView>
+  </Modal>
   );
 };
 
