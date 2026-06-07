@@ -96,11 +96,11 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.wrapper}
+        style={styles.modalContainer}
       >
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
         <LinearGradient colors={['#1A2035', '#0D1225']} style={styles.sheet}>
           {/* Header */}
           <View style={styles.header}>
@@ -113,7 +113,11 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: Spacing.xl }}
+          >
             {/* Diagnóstico resumen */}
             <Text style={styles.label}>Diagnóstico *</Text>
             <TextInput
@@ -204,21 +208,19 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  backdrop: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
-  wrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: Spacing.lg,
-    maxHeight: '85%',
+    maxHeight: '80%',
   },
   header: {
     flexDirection: 'row',
