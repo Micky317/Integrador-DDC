@@ -228,6 +228,28 @@ export default function PacienteDetalleScreen() {
     );
   };
 
+  const handleConfirmDeletePrescripcionMedica = (prescripcionId: string, diagnostico: string) => {
+    Alert.alert(
+      'Eliminar prescripción médica',
+      `¿Estás seguro de eliminar la prescripción del diagnóstico "${diagnostico || 'Sin diagnóstico'}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Eliminar', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await eliminarPrescripcionMedica(prescripcionId);
+            } catch (e) {
+              console.error("Error al eliminar prescripción médica:", e);
+              Alert.alert('Error', 'No se pudo eliminar la prescripción médica.');
+            }
+          } 
+        }
+      ]
+    );
+  };
+
   if (isLoading || !paciente) {
     return (
       <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
@@ -514,12 +536,15 @@ export default function PacienteDetalleScreen() {
             <Skeleton height={72} style={{ marginBottom: Spacing.sm }} />
           ) : prescripciones.length > 0 ? (
             prescripciones.map(p => (
-              <PrescripcionCard
+              <SwipeablePrescripcionCard
                 key={p.id}
-                prescripcion={p}
                 isMedico={isMedico}
-                onEliminar={(pid) => eliminarPrescripcionMedica(pid)}
-              />
+                onDelete={() => handleConfirmDeletePrescripcionMedica(p.id, p.diagnosticoResumen)}
+              >
+                <PrescripcionCard
+                  prescripcion={p}
+                />
+              </SwipeablePrescripcionCard>
             ))
           ) : (
             <View style={styles.emptyActivity}>

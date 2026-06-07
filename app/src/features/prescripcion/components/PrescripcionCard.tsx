@@ -15,14 +15,10 @@ const TRATAMIENTO_META: Record<string, { label: string; color: string }> = {
 
 interface PrescripcionCardProps {
   prescripcion: PrescripcionMedica;
-  isMedico: boolean;
-  onEliminar: (id: string) => void;
 }
 
 export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
   prescripcion,
-  isMedico,
-  onEliminar,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -35,17 +31,6 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
         day: '2-digit', month: 'short', year: 'numeric',
       })
     : null;
-
-  const handleEliminar = () => {
-    Alert.alert(
-      'Eliminar prescripción',
-      '¿Estás seguro de que querés eliminar esta prescripción?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => onEliminar(prescripcion.id) },
-      ]
-    );
-  };
 
   return (
     <GlassContainer style={styles.card}>
@@ -64,11 +49,6 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
             </View>
           </View>
           <View style={styles.headerRight}>
-            {isMedico && (
-              <TouchableOpacity onPress={handleEliminar} style={styles.deleteBtn}>
-                <Ionicons name="trash-outline" size={16} color={Colors.statusDanger} />
-              </TouchableOpacity>
-            )}
             <Ionicons
               name={expanded ? 'chevron-up' : 'chevron-down'}
               size={16}
