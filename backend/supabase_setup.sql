@@ -27,6 +27,14 @@ CREATE TABLE pacientes (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE vinculos_padres (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  padre_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  paciente_id UUID REFERENCES pacientes(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(padre_id, paciente_id)
+);
+
 CREATE TABLE analisis (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   paciente_id UUID REFERENCES pacientes(id) NOT NULL,
@@ -69,6 +77,7 @@ ALTER TABLE pacientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analisis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ejercicios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recordatorios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vinculos_padres ENABLE ROW LEVEL SECURITY;
 
 -- Perfil: cada usuario solo ve el suyo, o el administrador ve todo
 CREATE POLICY "usuarios_ven_su_perfil" ON profiles
@@ -78,9 +87,22 @@ CREATE POLICY "usuarios_ven_su_perfil" ON profiles
 CREATE POLICY "medicos_ven_sus_pacientes" ON pacientes
   FOR ALL USING (medico_id = auth.uid() OR (auth.jwt() -> 'user_metadata' ->> 'rol') = 'admin');
 
--- Padres solo ven a sus propios hijos
+-- Padres solo ven a sus propios hijos vinculados
 CREATE POLICY "padres_ven_sus_hijos" ON pacientes
+  FOR SELECT USING (
+    id IN (
+      SELECT paciente_id 
+      FROM vinculos_padres 
+      WHERE padre_id = auth.uid()
+    )
+  );
+
+-- Políticas para vinculos_padres
+CREATE POLICY "padres_ven_sus_vinculos" ON vinculos_padres
   FOR SELECT USING (padre_id = auth.uid());
+
+CREATE POLICY "padres_insertan_vinculos" ON vinculos_padres
+  FOR INSERT WITH CHECK (padre_id = auth.uid());
 
 -- Médicos ven y gestionan solo sus análisis, administrador ve todos
 CREATE POLICY "medicos_ven_sus_analisis" ON analisis
@@ -89,7 +111,11 @@ CREATE POLICY "medicos_ven_sus_analisis" ON analisis
 -- Padres pueden ver los análisis de sus hijos
 CREATE POLICY "padres_ven_analisis_hijos" ON analisis
   FOR SELECT USING (
-    paciente_id IN (SELECT id FROM pacientes WHERE padre_id = auth.uid())
+    paciente_id IN (
+      SELECT paciente_id 
+      FROM vinculos_padres 
+      WHERE padre_id = auth.uid()
+    )
   );
 
 -- Todos los usuarios autenticados pueden leer ejercicios
@@ -124,7 +150,11 @@ CREATE POLICY "medicos_gestionan_prescripciones" ON prescripciones_medicas
 
 CREATE POLICY "padres_ven_prescripciones_hijos" ON prescripciones_medicas
   FOR SELECT USING (
-    paciente_id IN (SELECT id FROM pacientes WHERE padre_id = auth.uid())
+    paciente_id IN (
+      SELECT paciente_id 
+      FROM vinculos_padres 
+      WHERE padre_id = auth.uid()
+    )
   );
 
 -- =============================================
