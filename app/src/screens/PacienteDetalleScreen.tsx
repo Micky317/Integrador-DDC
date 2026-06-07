@@ -104,6 +104,28 @@ export default function PacienteDetalleScreen() {
     ]);
   };
 
+  const handleConfirmDeletePrescripcion = (prescripcionId: string, titulo: string) => {
+    Alert.alert(
+      'Eliminar ejercicio',
+      `¿Estás seguro de eliminar el ejercicio "${titulo || 'Ejercicio'}" del plan del paciente?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Eliminar', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await eliminarPrescripcion(prescripcionId);
+            } catch (e) {
+              console.error("Error al eliminar prescripción:", e);
+              Alert.alert('Error', 'No se pudo eliminar el ejercicio.');
+            }
+          } 
+        }
+      ]
+    );
+  };
+
   if (isLoading || !paciente) {
     return (
       <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
@@ -285,29 +307,40 @@ export default function PacienteDetalleScreen() {
 
                   return (
                     <GlassContainer key={p.id} style={[styles.rehabCardVertical, isExpanded && { borderColor: Colors.primary + '40', borderWidth: 1 }]}>
-                      <TouchableOpacity 
-                        style={styles.rehabHeader}
-                        onPress={() => setExpandedExercise(isExpanded ? null : p.id)}
-                      >
-                        <View style={[styles.rehabIconBg, { backgroundColor: p.ejercicio?.color + '20' }]}>
-                          <Ionicons name={p.ejercicio?.icon} size={20} color={p.ejercicio?.color} />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                          <Text style={styles.rehabTitle}>{p.ejercicio?.titulo || 'Ejercicio'}</Text>
-                          <Text style={styles.rehabFreq}>{p.frecuencia_diaria} veces al día</Text>
-                        </View>
-                        
-                        {/* Badge de Estado General */}
-                        {ultimoSeguimiento && (
-                          <View style={[styles.statusBadge, { backgroundColor: isApproved ? 'rgba(16, 185, 129, 0.15)' : isPending ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 71, 87, 0.15)' }]}>
-                            <Text style={[styles.statusBadgeText, { color: isApproved ? "#10B981" : isPending ? "#F59E0B" : "#FF4757" }]}>
-                              {ultimoSeguimiento.estado}
-                            </Text>
+                      <View style={styles.rehabHeader}>
+                        <TouchableOpacity 
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                          onPress={() => setExpandedExercise(isExpanded ? null : p.id)}
+                        >
+                          <View style={[styles.rehabIconBg, { backgroundColor: p.ejercicio?.color + '20' }]}>
+                            <Ionicons name={p.ejercicio?.icon} size={20} color={p.ejercicio?.color} />
                           </View>
-                        )}
+                          <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                            <Text style={styles.rehabTitle}>{p.ejercicio?.titulo || 'Ejercicio'}</Text>
+                            <Text style={styles.rehabFreq}>{p.frecuencia_diaria} veces al día</Text>
+                          </View>
+                          
+                          {/* Badge de Estado General */}
+                          {ultimoSeguimiento && (
+                            <View style={[styles.statusBadge, { backgroundColor: isApproved ? 'rgba(16, 185, 129, 0.15)' : isPending ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 71, 87, 0.15)' }]}>
+                              <Text style={[styles.statusBadgeText, { color: isApproved ? "#10B981" : isPending ? "#F59E0B" : "#FF4757" }]}>
+                                {ultimoSeguimiento.estado}
+                              </Text>
+                            </View>
+                          )}
 
-                        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textMuted} style={{ marginLeft: 8 }} />
-                      </TouchableOpacity>
+                          <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textMuted} style={{ marginLeft: 8 }} />
+                        </TouchableOpacity>
+
+                        {isMedico && (
+                          <TouchableOpacity 
+                            onPress={() => handleConfirmDeletePrescripcion(p.id, p.ejercicio?.titulo)}
+                            style={{ padding: 8, marginLeft: Spacing.xs }}
+                          >
+                            <Ionicons name="trash-outline" size={20} color={Colors.statusDanger} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
 
                       {/* Lista de Intentos (Videos) - SOLO SE VE SI ESTÁ EXPANDIDO */}
                       {isExpanded && (
@@ -483,25 +516,41 @@ export default function PacienteDetalleScreen() {
                 </View>
                 
                 <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
-                  {CATALOGO_EJERCICIOS.map(ej => (
-                    <TouchableOpacity 
-                      key={ej.id} 
-                      style={styles.rehabOption} 
-                      onPress={() => { 
-                        prescribir({ medicoId: user?.id || '', ejercicioId: ej.id, frecuencia: 3 }); 
-                        setShowRehabModal(false); 
-                      }}
-                    >
-                      <View style={[styles.planIconBgSmall, { backgroundColor: ej.color + '20' }]}>
-                        <Ionicons name={ej.icon} size={20} color={ej.color} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.planOptionLabel, { color: ej.color }]}>{ej.titulo}</Text>
-                        <Text style={styles.planOptionDesc} numberOfLines={1}>{ej.descripcion}</Text>
-                      </View>
-                      <Ionicons name="add-circle" size={24} color={Colors.primary} />
-                    </TouchableOpacity>
-                  ))}
+                  {CATALOGO_EJERCICIOS.map(ej => {
+                    const yaPrescrito = (ejerciciosPrescritos || []).some((p: any) => {
+                      return (
+                        p.ejercicio_id === ej.id || 
+                        p.ejercicio_id?.includes(ej.id) || 
+                        ej.id.includes(p.ejercicio_id) ||
+                        (p.ejercicio_id === 'ranita' && ej.id === 'abduccion-ranita')
+                      );
+                    });
+
+                    return (
+                      <TouchableOpacity 
+                        key={ej.id} 
+                        style={[styles.rehabOption, yaPrescrito && { opacity: 0.5 }]} 
+                        disabled={yaPrescrito}
+                        onPress={() => { 
+                          prescribir({ medicoId: user?.id || '', ejercicioId: ej.id, frecuencia: 3 }); 
+                          setShowRehabModal(false); 
+                        }}
+                      >
+                        <View style={[styles.planIconBgSmall, { backgroundColor: ej.color + '20' }]}>
+                          <Ionicons name={ej.icon} size={20} color={ej.color} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.planOptionLabel, { color: ej.color }]}>{ej.titulo}</Text>
+                          <Text style={styles.planOptionDesc} numberOfLines={1}>{ej.descripcion}</Text>
+                        </View>
+                        {yaPrescrito ? (
+                          <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                        ) : (
+                          <Ionicons name="add-circle" size={24} color={Colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </GlassContainer>
             </TouchableOpacity>
