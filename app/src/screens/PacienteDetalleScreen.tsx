@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator, Animated, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +31,108 @@ const PLANES_CONFIG = [
 ];
 
 const PRIORITY_ORDER = ['cirugia', 'yeso', 'arnes', 'ejercicios', 'observacion'];
+
+interface SwipeablePrescripcionCardProps {
+  children: React.ReactNode;
+  onDelete: () => void;
+  isMedico: boolean;
+}
+
+function SwipeablePrescripcionCard({ children, onDelete, isMedico }: SwipeablePrescripcionCardProps) {
+  const translateX = React.useRef(new Animated.Value(0)).current;
+  const isOpen = React.useRef(false);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return (
+          isMedico &&
+          Math.abs(gestureState.dx) > 10 &&
+          Math.abs(gestureState.dy) < 10
+        );
+      },
+      onPanResponderMove: (_, gestureState) => {
+        let newX = gestureState.dx;
+        if (isOpen.current) {
+          newX = -80 + gestureState.dx;
+        }
+
+        if (newX < -120) {
+          newX = -120;
+        } else if (newX > 0) {
+          newX = 0;
+        }
+
+        translateX.setValue(newX);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const startX = isOpen.current ? -80 : 0;
+        const currentX = startX + gestureState.dx;
+
+        if (currentX < -40) {
+          Animated.spring(translateX, {
+            toValue: -80,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start(() => {
+            isOpen.current = true;
+          });
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start(() => {
+            isOpen.current = false;
+          });
+        }
+      },
+    })
+  ).current;
+
+  if (!isMedico) {
+    return <>{children}</>;
+  }
+
+  return (
+    <View style={{ width: '100%', overflow: 'hidden', borderRadius: Radius.lg }}>
+      <Animated.View
+        style={{
+          flexDirection: 'row',
+          width: '100%',
+          transform: [{ translateX }],
+        }}
+        {...panResponder.panHandlers}
+      >
+        <View style={{ width: '100%', flexShrink: 0 }}>
+          {children}
+        </View>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={{
+            width: 80,
+            backgroundColor: Colors.statusDanger,
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderTopRightRadius: Radius.lg,
+            borderBottomRightRadius: Radius.lg,
+          }}
+          onPress={() => {
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+            }).start(() => {
+              isOpen.current = false;
+              onDelete();
+            });
+          }}
+        >
+          <Ionicons name="trash-outline" size={24} color="#FFF" />
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function PacienteDetalleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -306,10 +408,14 @@ export default function PacienteDetalleScreen() {
                     );
 
                   return (
-                    <GlassContainer key={p.id} style={[styles.rehabCardVertical, isExpanded && { borderColor: Colors.primary + '40', borderWidth: 1 }]}>
-                      <View style={styles.rehabHeader}>
+                    <SwipeablePrescripcionCard
+                      key={p.id}
+                      isMedico={isMedico}
+                      onDelete={() => handleConfirmDeletePrescripcion(p.id, p.ejercicio?.titulo)}
+                    >
+                      <GlassContainer style={[styles.rehabCardVertical, isExpanded && { borderColor: Colors.primary + '40', borderWidth: 1 }]}>
                         <TouchableOpacity 
-                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                          style={styles.rehabHeader}
                           onPress={() => setExpandedExercise(isExpanded ? null : p.id)}
                         >
                           <View style={[styles.rehabIconBg, { backgroundColor: p.ejercicio?.color + '20' }]}>
@@ -332,70 +438,61 @@ export default function PacienteDetalleScreen() {
                           <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={Colors.textMuted} style={{ marginLeft: 8 }} />
                         </TouchableOpacity>
 
-                        {isMedico && (
-                          <TouchableOpacity 
-                            onPress={() => handleConfirmDeletePrescripcion(p.id, p.ejercicio?.titulo)}
-                            style={{ padding: 8, marginLeft: Spacing.xs }}
-                          >
-                            <Ionicons name="trash-outline" size={20} color={Colors.statusDanger} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                        {/* Lista de Intentos (Videos) - SOLO SE VE SI ESTÁ EXPANDIDO */}
+                        {isExpanded && (
+                          <View style={styles.intentosContainer}>
+                            {historialDeEsteEjercicio.length > 0 ? (
+                              <>
+                                <Text style={styles.intentosLabel}>Historial de Videos ({historialDeEsteEjercicio.length})</Text>
+                                {historialDeEsteEjercicio.map((seg: any) => {
+                                  const fecha = new Date(seg.creado_en).toLocaleDateString();
+                                  return (
+                                    <View key={seg.id} style={styles.intentoItem}>
+                                      <View style={styles.intentoMain}>
+                                        <View style={[styles.intentoDot, { backgroundColor: seg.estado === 'Aprobado' ? '#10B981' : seg.estado === 'En revisión' ? '#F59E0B' : '#FF4757' }]} />
+                                        <View style={{ flex: 1 }}>
+                                          <Text style={styles.intentoMeta}>{fecha} · <Text style={{ fontWeight: 'bold' }}>{seg.estado}</Text></Text>
+                                          {seg.comentarios_medico && (
+                                            <Text style={styles.intentoComment} numberOfLines={1}>"{seg.comentarios_medico}"</Text>
+                                          )}
+                                        </View>
+                                      </View>
+                                      
+                                      <View style={styles.intentoActions}>
+                                        <TouchableOpacity 
+                                          onPress={() => {
+                                            const { data } = supabase.storage.from('ejercicios_videos').getPublicUrl(seg.video_url);
+                                            setSelectedVideo({ 
+                                              url: data.publicUrl, 
+                                              ejercicioId: p.id, 
+                                              ejercicioNombre: p.ejercicio?.titulo || 'Ejercicio' 
+                                            });
+                                          }}
+                                          style={styles.intentoPlayBtn}
+                                        >
+                                          <Ionicons name="play" size={16} color={Colors.primary} />
+                                        </TouchableOpacity>
 
-                      {/* Lista de Intentos (Videos) - SOLO SE VE SI ESTÁ EXPANDIDO */}
-                      {isExpanded && (
-                        <View style={styles.intentosContainer}>
-                          {historialDeEsteEjercicio.length > 0 ? (
-                            <>
-                              <Text style={styles.intentosLabel}>Historial de Videos ({historialDeEsteEjercicio.length})</Text>
-                              {historialDeEsteEjercicio.map((seg: any) => {
-                                const fecha = new Date(seg.creado_en).toLocaleDateString();
-                                return (
-                                  <View key={seg.id} style={styles.intentoItem}>
-                                    <View style={styles.intentoMain}>
-                                      <View style={[styles.intentoDot, { backgroundColor: seg.estado === 'Aprobado' ? '#10B981' : seg.estado === 'En revisión' ? '#F59E0B' : '#FF4757' }]} />
-                                      <View style={{ flex: 1 }}>
-                                        <Text style={styles.intentoMeta}>{fecha} · <Text style={{ fontWeight: 'bold' }}>{seg.estado}</Text></Text>
-                                        {seg.comentarios_medico && (
-                                          <Text style={styles.intentoComment} numberOfLines={1}>"{seg.comentarios_medico}"</Text>
+                                        {isMedico && (
+                                          <TouchableOpacity 
+                                            onPress={() => handleConfirmDeleteVideo(seg.id, seg.video_url)}
+                                            style={styles.intentoDeleteBtn}
+                                          >
+                                            <Ionicons name="trash-outline" size={16} color={Colors.statusDanger} />
+                                          </TouchableOpacity>
                                         )}
                                       </View>
                                     </View>
-                                    
-                                    <View style={styles.intentoActions}>
-                                      <TouchableOpacity 
-                                        onPress={() => {
-                                          const { data } = supabase.storage.from('ejercicios_videos').getPublicUrl(seg.video_url);
-                                          setSelectedVideo({ 
-                                            url: data.publicUrl, 
-                                            ejercicioId: p.id, 
-                                            ejercicioNombre: p.ejercicio?.titulo || 'Ejercicio' 
-                                          });
-                                        }}
-                                        style={styles.intentoPlayBtn}
-                                      >
-                                        <Ionicons name="play" size={16} color={Colors.primary} />
-                                      </TouchableOpacity>
-
-                                      {isMedico && (
-                                        <TouchableOpacity 
-                                          onPress={() => handleConfirmDeleteVideo(seg.id, seg.video_url)}
-                                          style={styles.intentoDeleteBtn}
-                                        >
-                                          <Ionicons name="trash-outline" size={16} color={Colors.statusDanger} />
-                                        </TouchableOpacity>
-                                      )}
-                                    </View>
-                                  </View>
-                                );
-                              })}
-                            </>
-                          ) : (
-                            <Text style={styles.sinIntentosText}>Sin videos enviados aún.</Text>
-                          )}
-                        </View>
-                      )}
-                    </GlassContainer>
+                                  );
+                                })}
+                              </>
+                            ) : (
+                              <Text style={styles.sinIntentosText}>Sin videos enviados aún.</Text>
+                            )}
+                          </View>
+                        )}
+                      </GlassContainer>
+                    </SwipeablePrescripcionCard>
                   );
                 })}
               </View>
