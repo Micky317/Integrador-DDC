@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius } from '../../../constants/theme';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { Analisis } from '../../../types';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const TRATAMIENTOS_CONFIG = [
   { id: 'ejercicios', label: 'Ejercicios y Masajes', color: Colors.statusNormal },
@@ -54,6 +55,10 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
   const [tratamientos, setTratamientos] = useState<string[]>([]);
   const [vincularAnalisis, setVincularAnalisis] = useState(true);
 
+  // Estados para el DatePicker nativo
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
   useEffect(() => {
     if (visible) {
       setTratamientos(tratamientosActuales);
@@ -71,9 +76,30 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
       }
       setIndicaciones('');
       setProximaRevision('');
+      setSelectedDate(null);
       setVincularAnalisis(true);
     }
   }, [visible]);
+
+  const handleDateChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      if (event.type === 'set') {
+        setShowDatePicker(false);
+        if (date) {
+          setSelectedDate(date);
+          setProximaRevision(date.toISOString().split('T')[0]);
+        }
+      } else if (event.type === 'dismissed') {
+        setShowDatePicker(false);
+      }
+    } else {
+      // Para iOS (donde el picker puede estar inline o spinner persistente)
+      if (date) {
+        setSelectedDate(date);
+        setProximaRevision(date.toISOString().split('T')[0]);
+      }
+    }
+  };
 
   const toggleTratamiento = (id: string) => {
     setTratamientos(prev =>
@@ -168,15 +194,45 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
             />
 
             {/* Próxima revisión */}
-            <Text style={styles.label}>Próxima revisión (AAAA-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              value={proximaRevision}
-              onChangeText={setProximaRevision}
-              placeholder="Ej: 2025-08-15"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="numeric"
-            />
+            <Text style={styles.label}>Próxima revisión</Text>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+              <Text style={[
+                styles.datePickerText,
+                !selectedDate && { color: Colors.textMuted }
+              ]}>
+                {selectedDate 
+                  ? selectedDate.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  : 'Seleccionar fecha de revisión'
+                }
+              </Text>
+              {selectedDate && (
+                <TouchableOpacity 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedDate(null);
+                    setProximaRevision('');
+                  }}
+                  style={styles.clearDateBtn}
+                >
+                  <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate || new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                minimumDate={new Date()}
+                onChange={handleDateChange}
+              />
+            )}
 
             {/* Vincular análisis */}
             {ultimoAnalisis && (
@@ -311,5 +367,24 @@ const styles = StyleSheet.create({
   btn: {
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: Colors.borderDefault,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  datePickerText: {
+    color: Colors.textPrimary,
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.fonts.regular,
+    flex: 1,
+  },
+  clearDateBtn: {
+    padding: 2,
   },
 });

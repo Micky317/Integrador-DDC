@@ -27,6 +27,7 @@ export const vinculosService = {
         doctorId: data.medico_id,
         creadoEn: data.created_at,
         estadoGraf: data.estado_graf,
+        proximaRevision: data.proxima_revision,
         tratamientosAsignados: data.tratamientos_asignados || [],
         edadGestacional: data.edad_gestacional,
       };
@@ -77,6 +78,7 @@ export const vinculosService = {
           doctorId: p.medico_id,
           creadoEn: p.created_at,
           estadoGraf: p.estado_graf,
+          proximaRevision: p.proxima_revision,
           tratamientosAsignados: p.tratamientos_asignados || [],
           edadGestacional: p.edad_gestacional,
         };

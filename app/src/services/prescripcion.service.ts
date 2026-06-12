@@ -13,6 +13,35 @@ const mapPrescripcion = (p: any): PrescripcionMedica => ({
   creadoEn: p.created_at,
 });
 
+function formatToPostgresDate(dateStr: string | undefined): string | null {
+  if (!dateStr) return null;
+  const cleaned = dateStr.trim();
+  if (!cleaned) return null;
+
+  // 1. Caso YYYY-MM-DD o YYYY/MM/DD
+  const yyyymmdd = /^\d{4}[-/](\d{1,2})[-/](\d{1,2})$/;
+  const matchY = cleaned.match(yyyymmdd);
+  if (matchY) {
+    const [_, month, day] = matchY;
+    const year = cleaned.substring(0, 4);
+    const paddedMonth = month.padStart(2, '0');
+    const paddedDay = day.padStart(2, '0');
+    return `${year}-${paddedMonth}-${paddedDay}`;
+  }
+
+  // 2. Caso DD-MM-YYYY o DD/MM/YYYY
+  const ddmmyyyy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/;
+  const matchD = cleaned.match(ddmmyyyy);
+  if (matchD) {
+    const [_, day, month, year] = matchD;
+    const paddedDay = day.padStart(2, '0');
+    const paddedMonth = month.padStart(2, '0');
+    return `${year}-${paddedMonth}-${paddedDay}`;
+  }
+
+  return cleaned;
+}
+
 export const prescripcionService = {
   async getByPaciente(pacienteId: string): Promise<PrescripcionMedica[]> {
     const { data, error } = await supabase
@@ -34,6 +63,8 @@ export const prescripcionService = {
     proximaRevision?: string;
     analisisId?: string;
   }): Promise<PrescripcionMedica> {
+    const formattedDate = formatToPostgresDate(payload.proximaRevision);
+
     const { data, error } = await supabase
       .from('prescripciones_medicas')
       .insert([{
@@ -42,13 +73,22 @@ export const prescripcionService = {
         diagnostico_resumen: payload.diagnosticoResumen,
         tratamientos: payload.tratamientos,
         indicaciones: payload.indicaciones || null,
-        proxima_revision: payload.proximaRevision || null,
+        proxima_revision: formattedDate,
         analisis_id: payload.analisisId || null,
       }])
       .select()
       .single();
 
     if (error) throw error;
+
+    // Actualizar la fecha de proxima_revision en el expediente del paciente
+    if (formattedDate) {
+      await supabase
+        .from('pacientes')
+        .update({ proxima_revision: formattedDate })
+        .eq('id', payload.pacienteId);
+    }
+
     return mapPrescripcion(data);
   },
 

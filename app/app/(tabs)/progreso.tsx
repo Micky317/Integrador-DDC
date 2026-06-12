@@ -8,14 +8,17 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../../src/constants
 import { GlassContainer } from '../../src/components/GlassContainer';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { useVinculosPadre } from '../../src/features/padres/hooks/useVinculos';
+import { useNotificacionesPadre } from '../../src/features/padres/hooks/useNotificacionesPadre';
 import { PacienteCard } from '../../src/features/pacientes/components/PacienteCard';
 import { useAppStore } from '../../src/store/useAppStore';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function MisBebesScreen() {
   const { misBebes, isLoading, vincular, isLinking } = useVinculosPadre();
   const { user } = useAppStore();
+  
+  // Registrar e iniciar notificaciones locales para el padre
+  useNotificacionesPadre(misBebes);
   const [showModal, setShowModal] = useState(false);
   const [codigo, setCodigo] = useState('');
 
