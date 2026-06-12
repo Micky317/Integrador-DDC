@@ -34,7 +34,7 @@ export const ZoomViewerModal: React.FC<ZoomViewerModalProps> = ({
         >
           <Image 
             source={{ uri: imageUri }} 
-            style={{ width: '100%', height: '100%' }} 
+            style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height }} 
             resizeMode="contain" 
           />
         </ScrollView>

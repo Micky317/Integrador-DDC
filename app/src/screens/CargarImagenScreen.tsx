@@ -24,6 +24,7 @@ import { GlassContainer } from '../components/GlassContainer';
 import { pacientesService } from '../services/pacientes.service';
 import { styles } from './CargarImagenScreen.styles';
 import { formatLocalDate } from '../utils/helpers';
+import { ZoomViewerModal } from '../features/analisis/components/ZoomViewerModal';
 
 type ImageSource = 'dicom' | 'galeria' | 'camara' | null;
 
@@ -32,6 +33,7 @@ export default function CargarImagenScreen() {
   const esRapido = modoRapido === '1';
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<ImageSource>(null);
+  const [showFullImage, setShowFullImage] = useState(false);
   
   // Estado para la fecha de la placa
   const [fechaPlaca, setFechaPlaca] = useState<Date>(new Date());
@@ -217,16 +219,22 @@ export default function CargarImagenScreen() {
         {/* Drop Zone / Image Preview */}
         {imageUri ? (
           <>
-            <GlassContainer intensity={30} style={styles.imagePreviewContainer}>
-              <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
-              <LinearGradient 
-                colors={['transparent', 'rgba(9, 13, 31, 0.9)']} 
-                style={styles.imageOverlay}
-              >
-                <Ionicons name="checkmark-circle" size={32} color={Colors.primary} />
-                <Text style={styles.imageOverlayText}>Radiografía lista</Text>
-              </LinearGradient>
-            </GlassContainer>
+            <TouchableOpacity 
+              activeOpacity={0.9} 
+              onPress={() => setShowFullImage(true)}
+              style={{ width: '100%' }}
+            >
+              <GlassContainer intensity={30} style={styles.imagePreviewContainer}>
+                <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+                <LinearGradient 
+                  colors={['transparent', 'rgba(9, 13, 31, 0.9)']} 
+                  style={styles.imageOverlay}
+                >
+                  <Ionicons name="eye-outline" size={32} color={Colors.primary} />
+                  <Text style={styles.imageOverlayText}>Radiografía lista (Toca para ampliar)</Text>
+                </LinearGradient>
+              </GlassContainer>
+            </TouchableOpacity>
             
             {/* DATE PICKER */}
             <View style={{ backgroundColor: Colors.bgCard, borderRadius: Radius.md, padding: Spacing.md, marginTop: Spacing.sm, borderWidth: 1, borderColor: Colors.borderCard, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -311,6 +319,13 @@ export default function CargarImagenScreen() {
           disabled={!imageUri && selectedSource !== 'dicom'}
         />
       </View>
+
+      {/* Modal de Zoom antes de enviar a analizar */}
+      <ZoomViewerModal
+        visible={showFullImage}
+        onClose={() => setShowFullImage(false)}
+        imageUri={imageUri ?? undefined}
+      />
     </LinearGradient>
   );
 }
