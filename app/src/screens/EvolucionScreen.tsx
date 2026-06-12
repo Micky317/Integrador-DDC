@@ -215,7 +215,7 @@ export default function EvolucionScreen() {
     if (!proyeccion) return '';
     
     if (proyeccion.ya_esta_sano) {
-      return 'Ambos ángulos acetabulares se encuentran actualmente dentro del rango normal (<28°). Se recomienda continuar con controles rutinarios indicados por el médico.';
+      return '🎉 ¡Felicidades! Ambos ángulos acetabulares están dentro del rango normal (<28°). ¡Todo el esfuerzo ha valido la pena! Continúa con los controles preventivos indicados por tu médico.';
     }
 
     const trats = proyeccion.tratamientos_activos;
@@ -232,26 +232,39 @@ export default function EvolucionScreen() {
       return 'Observación';
     }).join(' + ') || 'Observación';
 
-    let text = `Con base en el tratamiento activo de ${treatmentsLabels}`;
+    let text = '';
     
+    // Frase motivacional inicial basada en el cumplimiento de ejercicios
     if (compliance !== null && compliance !== undefined && trats.includes('ejercicios')) {
-      text += ` y la adherencia registrada del ${compliance}% en la rehabilitación de los últimos 30 días`;
+      if (compliance >= 80) {
+        text += `✨ ¡Espectacular! Con una constancia del ${compliance}% en la rehabilitación, estás haciendo un trabajo extraordinario. `;
+      } else if (compliance >= 50) {
+        text += `👍 ¡Buen esfuerzo! Registras una constancia del ${compliance}% en los ejercicios diarios. `;
+      } else {
+        text += `💪 ¡Vamos, tú puedes! Actualmente registras una constancia del ${compliance}%. `;
+      }
+    } else {
+      text += `📋 Siguiendo el tratamiento activo de ${treatmentsLabels}, `;
     }
-    
-    text += `, se proyecta una corrección clínica promedio de ~${rate.toFixed(2)}° por mes.`;
+
+    text += `se proyecta una tasa de corrección promedio de ~${rate.toFixed(2)}° por mes en las caderas.`;
     
     if (months) {
-      text += ` A este ritmo constante, se estima alcanzar el rango normal (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}.`;
+      text += ` A este ritmo constante, tu bebé alcanzará el rango normal (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}. ¡Cada sesión de masajes y ejercicios cuenta!`;
     } else {
-      text += ` El tiempo estimado de recuperación requiere acumular más datos en los controles radiográficos.`;
+      text += ` Para darte un estimado de tiempo exacto, el sistema necesita recopilar los datos de tu próximo control radiográfico.`;
     }
 
     if (age > 12) {
-      text += `\n\n💡 Nota: Como el paciente tiene ${age.toFixed(1)} meses de edad, los huesos de la pelvis están más calcificados (maduros), lo que ralentiza la tasa de corrección en comparación con bebés menores de 6 meses.`;
+      text += `\n\n💡 Nota médica: Como tu bebé tiene ${age.toFixed(1)} meses de edad, la calcificación natural del hueso es mayor, por lo que la cadera corrige más lentamente. ¡Por eso la paciencia y la constancia diaria son tus mejores aliadas en esta etapa!`;
     }
 
-    if (compliance !== null && compliance !== undefined && trats.includes('ejercicios') && compliance < 60) {
-      text += `\n\n⚠️ Consejo: Si se incrementa la adherencia diaria a los ejercicios (actualmente de ${compliance}%) por encima del 80%, la pendiente de la proyección bajará más rápido y la meta de recuperación podría acortarse en varios meses.`;
+    if (compliance !== null && compliance !== undefined && trats.includes('ejercicios') && compliance < 80) {
+      // Calculamos una tasa potencial si sube al 80% (aproximamos una mejora del 50% en la pendiente)
+      const potentialRate = rate * 1.5;
+      text += `\n\n🎯 Reto de recuperación: Si subes la constancia diaria del ${compliance}% al 80% o más, la tasa de mejora podría subir a ~${potentialRate.toFixed(2)}° al mes. ¡Esto podría recortar el tiempo de tratamiento en varios meses!`;
+    } else if (compliance !== null && compliance !== undefined && compliance >= 80) {
+      text += `\n\n🔥 ¡Mantén la racha! Tu disciplina de alta adherencia asegura que la proyección se cumpla en el menor tiempo estimado posible. ¡Sigue cuidando así la salud de tu bebé!`;
     }
 
     return text;
