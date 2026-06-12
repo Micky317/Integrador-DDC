@@ -211,6 +211,52 @@ export default function EvolucionScreen() {
     };
   }, [historial, proyeccion]);
 
+  const narrativaText = useMemo(() => {
+    if (!proyeccion) return '';
+    
+    if (proyeccion.ya_esta_sano) {
+      return 'Ambos ángulos acetabulares se encuentran actualmente dentro del rango normal (<28°). Se recomienda continuar con controles rutinarios indicados por el médico.';
+    }
+
+    const trats = proyeccion.tratamientos_activos;
+    const rate = Math.abs(proyeccion.tasa_tratamiento_mensual);
+    const months = proyeccion.meses_para_meta;
+    const compliance = proyeccion.cumplimiento_ejercicios_pct;
+    const age = proyeccion.edad_actual_meses;
+
+    const treatmentsLabels = trats.map(t => {
+      if (t === 'yeso') return 'Yeso Pélvico';
+      if (t === 'arnes') return 'Arnés de Pavlik';
+      if (t === 'ejercicios') return 'Ejercicios';
+      if (t === 'cirugia') return 'Quirúrgico';
+      return 'Observación';
+    }).join(' + ') || 'Observación';
+
+    let text = `Con base en el tratamiento activo de ${treatmentsLabels}`;
+    
+    if (compliance !== null && compliance !== undefined && trats.includes('ejercicios')) {
+      text += ` y la adherencia registrada del ${compliance}% en la rehabilitación de los últimos 30 días`;
+    }
+    
+    text += `, se proyecta una corrección clínica promedio de ~${rate.toFixed(2)}° por mes.`;
+    
+    if (months) {
+      text += ` A este ritmo constante, se estima alcanzar el rango normal (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}.`;
+    } else {
+      text += ` El tiempo estimado de recuperación requiere acumular más datos en los controles radiográficos.`;
+    }
+
+    if (age > 12) {
+      text += `\n\n💡 Nota: Como el paciente tiene ${age.toFixed(1)} meses de edad, los huesos de la pelvis están más calcificados (maduros), lo que ralentiza la tasa de corrección en comparación con bebés menores de 6 meses.`;
+    }
+
+    if (compliance !== null && compliance !== undefined && trats.includes('ejercicios') && compliance < 60) {
+      text += `\n\n⚠️ Consejo: Si se incrementa la adherencia diaria a los ejercicios (actualmente de ${compliance}%) por encima del 80%, la pendiente de la proyección bajará más rápido y la meta de recuperación podría acortarse en varios meses.`;
+    }
+
+    return text;
+  }, [proyeccion]);
+
   return (
     <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
       <StatusBar style="light" />
@@ -382,6 +428,11 @@ export default function EvolucionScreen() {
                         </>
                       )}
                     </View>
+                    {narrativaText ? (
+                      <View style={styles.predNarrativeBox}>
+                        <Text style={styles.predNarrativeText}>{narrativaText}</Text>
+                      </View>
+                    ) : null}
                   </GlassContainer>
                 </>
               )}
@@ -514,6 +565,20 @@ const styles = StyleSheet.create({
   predGoalRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   predGoalText: { color: Colors.textPrimary, fontSize: Typography.size.sm, flex: 1, fontFamily: Typography.fonts.medium },
   predRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: Radius.md, padding: Spacing.md },
+  predNarrativeBox: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    marginTop: 12,
+  },
+  predNarrativeText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: Typography.fonts.regular,
+  },
   predCol: { flex: 1, alignItems: 'center', gap: 4 },
   predDivider: { width: 1, height: 50, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: 4 },
   predColTitle: { color: Colors.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
