@@ -29,6 +29,8 @@ export interface PacienteProyeccion {
   meses_para_meta: number | null;
   proyeccion_izq: ProyeccionPunto[];
   proyeccion_der: ProyeccionPunto[];
+  pronostico_inicial_izq?: number[];
+  pronostico_inicial_der?: number[];
   historial_vacio?: boolean;
 }
 

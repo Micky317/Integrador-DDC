@@ -116,8 +116,8 @@ export default function EvolucionScreen() {
 
   const isLoading = loadingP || loadingH || loadingR || (loadingProj && showPrediction && activeTab === 'IA');
 
-  const { lineDataIzq, lineDataDer, chartDataIzq, chartDataDer, historicalCount, tendencia, predictionInfo } = useMemo(() => {
-    const empty = { lineDataIzq: [], lineDataDer: [], chartDataIzq: [], chartDataDer: [], historicalCount: 0, tendencia: null, predictionInfo: null };
+  const { lineDataIzq, lineDataDer, chartDataIzq, chartDataDer, initialForecastDataIzq, initialForecastDataDer, historicalCount, tendencia, predictionInfo } = useMemo(() => {
+    const empty = { lineDataIzq: [], lineDataDer: [], chartDataIzq: [], chartDataDer: [], initialForecastDataIzq: [], initialForecastDataDer: [], historicalCount: 0, tendencia: null, predictionInfo: null };
     if (historial.length === 0) return empty;
 
     const sorted = [...historial].sort((a, b) =>
@@ -140,7 +140,17 @@ export default function EvolucionScreen() {
     } : null;
 
     if (sorted.length < 2 || !proyeccion) {
-      return { lineDataIzq: dataIzq, lineDataDer: dataDer, chartDataIzq: dataIzq, chartDataDer: dataDer, historicalCount: sorted.length, tendencia: tend, predictionInfo: null };
+      return { 
+        lineDataIzq: dataIzq, 
+        lineDataDer: dataDer, 
+        chartDataIzq: dataIzq, 
+        chartDataDer: dataDer, 
+        initialForecastDataIzq: [], 
+        initialForecastDataDer: [], 
+        historicalCount: sorted.length, 
+        tendencia: tend, 
+        predictionInfo: null 
+      };
     }
 
     const predIzq = proyeccion.proyeccion_izq.map(p => ({
@@ -200,11 +210,23 @@ export default function EvolucionScreen() {
       }
     };
 
+    const initialForecastDataIzq = proyeccion.pronostico_inicial_izq?.map(val => ({
+      value: val,
+      hideDataPoints: true,
+    })) || [];
+
+    const initialForecastDataDer = proyeccion.pronostico_inicial_der?.map(val => ({
+      value: val,
+      hideDataPoints: true,
+    })) || [];
+
     return {
       lineDataIzq: dataIzq,
       lineDataDer: dataDer,
       chartDataIzq: [...dataIzq, ...predIzq],
       chartDataDer: [...dataDer, ...predDer],
+      initialForecastDataIzq,
+      initialForecastDataDer,
       historicalCount: sorted.length,
       tendencia: tend,
       predictionInfo: predInfo,
@@ -353,25 +375,39 @@ export default function EvolucionScreen() {
               )}
               <GlassContainer intensity={20} style={styles.chartCard}>
                 <View style={styles.legend}>
-                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#4D6EE3' }]} /><Text style={styles.legendText}>Izquierda</Text></View>
-                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#00E5CC' }]} /><Text style={styles.legendText}>Derecha</Text></View>
+                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#4D6EE3' }]} /><Text style={styles.legendText}>Izq</Text></View>
+                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#00E5CC' }]} /><Text style={styles.legendText}>Der</Text></View>
                   {predictionInfo && showPrediction && (
-                    <View style={styles.legendItem}>
-                      <View style={styles.legendDotHollow} />
-                      <Text style={styles.legendText}>Proyección</Text>
-                    </View>
+                    <>
+                      <View style={styles.legendItem}>
+                        <View style={styles.legendDotHollow} />
+                        <Text style={styles.legendText}>Proy. Actual</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDotHollow, { borderColor: '#888888', borderStyle: 'dashed' }]} />
+                        <Text style={styles.legendText}>Plan Ideal</Text>
+                      </View>
+                    </>
                   )}
                 </View>
                 <LineChart
                   data={showPrediction ? chartDataIzq : lineDataIzq}
                   data2={showPrediction ? chartDataDer : lineDataDer}
+                  data3={showPrediction ? initialForecastDataIzq : []}
+                  data4={showPrediction ? initialForecastDataDer : []}
                   height={200}
                   width={SCREEN_W - 100}
                   initialSpacing={20}
                   spacing={Math.max(35, Math.floor((SCREEN_W - 140) / Math.max((showPrediction ? chartDataIzq : lineDataIzq).length - 1, 1)))}
                   color1="#4D6EE3"
                   color2="#00E5CC"
+                  color3="rgba(77, 110, 227, 0.22)"
+                  color4="rgba(0, 229, 204, 0.22)"
                   thickness={3}
+                  thickness3={1.5}
+                  thickness4={1.5}
+                  strokeDashArray3={[4, 4]}
+                  strokeDashArray4={[4, 4]}
                   dataPointsColor1="#4D6EE3"
                   dataPointsColor2="#00E5CC"
                   dataPointsRadius={5}

@@ -375,7 +375,45 @@ def generate_patient_projection(paciente_id: str, granularity: str = "meses") ->
             
             last_offset = months_offset
             
-        # 7. Estimación de meses para la meta (< 28 grados)
+        # 7. Calcular el Pronóstico Inicial Ideal (desde la primera radiografía, 100% de cumplimiento, gamma=1.0)
+        first_analysis = analyses_sorted[0]
+        x_first = calculate_age_months(birth_date, get_date(first_analysis))
+        y_first_izq = float(first_analysis["angulo_izq"])
+        y_first_der = float(first_analysis["angulo_der"])
+        
+        rate_ideal = base_rate
+        pronostico_inicial_izq = []
+        pronostico_inicial_der = []
+        
+        def calculate_ideal_val(y_start, x_current):
+            if x_current <= x_first + 0.01:
+                return y_start
+            curr_x = x_first
+            curr_y = y_start
+            dt_step = 0.5
+            while curr_x < x_current - 0.001:
+                dt = min(dt_step, x_current - curr_x)
+                f_age_tmp = get_age_calcification_factor(curr_x + dt)
+                std_growth_tmp = get_standard_angle(curr_x + dt) - get_standard_angle(curr_x)
+                treatment_effect_tmp = (rate_ideal * f_age_tmp * 1.0) * dt
+                curr_y = max(0.0, curr_y + std_growth_tmp + treatment_effect_tmp)
+                curr_x += dt
+            return round(curr_y, 2)
+
+        # Puntos del pronóstico inicial alineados con el histórico
+        for a in analyses_sorted:
+            x_a = calculate_age_months(birth_date, get_date(a))
+            pronostico_inicial_izq.append(calculate_ideal_val(y_first_izq, x_a))
+            pronostico_inicial_der.append(calculate_ideal_val(y_first_der, x_a))
+            
+        # Puntos del pronóstico inicial alineados con los pasos futuros
+        for step in steps:
+            months_offset = step_to_months(step)
+            x_future = x0 + months_offset
+            pronostico_inicial_izq.append(calculate_ideal_val(y_first_izq, x_future))
+            pronostico_inicial_der.append(calculate_ideal_val(y_first_der, x_future))
+
+        # 8. Estimación de meses para la meta (< 28 grados)
         avg_current = (y0_izq + y0_der) / 2.0
         already_normal = avg_current <= 28.0
         
@@ -412,7 +450,9 @@ def generate_patient_projection(paciente_id: str, granularity: str = "meses") ->
             "ya_esta_sano": already_normal,
             "meses_para_meta": months_to_goal,
             "proyeccion_izq": projected_izq,
-            "proyeccion_der": projected_der
+            "proyeccion_der": projected_der,
+            "pronostico_inicial_izq": pronostico_inicial_izq,
+            "pronostico_inicial_der": pronostico_inicial_der
         }
     except Exception as e:
         import traceback
