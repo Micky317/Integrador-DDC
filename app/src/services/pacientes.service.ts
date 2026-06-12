@@ -1,5 +1,36 @@
+import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Paciente } from '../types';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? 'http://localhost:8005' : 'http://192.168.0.2:8005');
+
+export interface ProyeccionPunto {
+  step: number;
+  label: string;
+  fecha: string;
+  angulo_proyectado: number;
+  edad_meses: number;
+}
+
+export interface PacienteProyeccion {
+  paciente_id: string;
+  nombre_completo: string;
+  edad_actual_meses: number;
+  ultima_medicion: {
+    fecha: string;
+    izq: number;
+    der: number;
+  };
+  tratamientos_activos: string[];
+  cumplimiento_ejercicios_pct: number | null;
+  factor_respuesta_paciente: number;
+  tasa_tratamiento_mensual: number;
+  ya_esta_sano: boolean;
+  meses_para_meta: number | null;
+  proyeccion_izq: ProyeccionPunto[];
+  proyeccion_der: ProyeccionPunto[];
+  historial_vacio?: boolean;
+}
 
 const mapPaciente = (p: any): Paciente => ({
   id: p.id,
@@ -95,5 +126,17 @@ export const pacientesService = {
       .delete()
       .eq('id', pacienteId);
     if (error) throw error;
+  },
+
+  /**
+   * Obtiene la proyección de la evolución del paciente basada en su edad, historial, tratamientos y cumplimiento.
+   */
+  async getProyeccionClinica(pacienteId: string, granularity: 'dias' | 'semanas' | 'meses' = 'meses'): Promise<PacienteProyeccion> {
+    const response = await fetch(`${API_URL}/clinical/pacientes/${pacienteId}/proyeccion?granularity=${granularity}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Error al obtener la proyección clínica');
+    }
+    return response.json();
   },
 };

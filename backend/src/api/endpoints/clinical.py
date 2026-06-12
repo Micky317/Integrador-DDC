@@ -46,3 +46,19 @@ async def trigger_synchronization():
         return {"status": "success", "message": "Datos sincronizados correctamente con InfluxDB"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en la sincronización: {str(e)}")
+
+@router.get("/pacientes/{id}/proyeccion")
+async def get_patient_projection(id: str, granularity: str = "meses"):
+    """
+    Retorna la proyección dinámica del paciente basada en su edad, historial, tratamientos y cumplimiento.
+    """
+    try:
+        from src.services.projection import generate_patient_projection
+        res = generate_patient_projection(id, granularity=granularity)
+        if "error" in res:
+            raise HTTPException(status_code=404, detail=res["error"])
+        return res
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error interno al calcular la proyección: {str(e)}")

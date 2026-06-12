@@ -108,26 +108,13 @@ export default function EvolucionScreen() {
     enabled: !!pacienteId,
   });
 
-  const isLoading = loadingP || loadingH || loadingR;
+  const { data: proyeccion, isLoading: loadingProj } = useQuery({
+    queryKey: ['proyeccion', pacienteId, predGranularity],
+    queryFn: () => pacientesService.getProyeccionClinica(pacienteId ?? '', predGranularity),
+    enabled: !!pacienteId && showPrediction && activeTab === 'IA',
+  });
 
-  const complianceFactor = useMemo(() => {
-    if (!rehabHistorial.length) return 0.5;
-    const today = new Date();
-    const activeDays = new Set<string>();
-    rehabHistorial.forEach(h => {
-      const d = new Date(h.fecha);
-      const diff = (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
-      if (diff >= 0 && diff <= 30 && (h.duracion_segundos || 0) >= 600) {
-        activeDays.add(h.fecha.split('T')[0]);
-      }
-    });
-    return Math.max(0.3, Math.min(1.0, activeDays.size / 30));
-  }, [rehabHistorial]);
-
-  const primaryTratamiento = useMemo((): TreatmentId => {
-    const t = paciente?.tratamientosAsignados || [];
-    return TREATMENT_PRIORITY.find(p => t.includes(p)) ?? 'observacion';
-  }, [paciente]);
+  const isLoading = loadingP || loadingH || loadingR || (loadingProj && showPrediction && activeTab === 'IA');
 
   const { lineDataIzq, lineDataDer, chartDataIzq, chartDataDer, historicalCount, tendencia, predictionInfo } = useMemo(() => {
     const empty = { lineDataIzq: [], lineDataDer: [], chartDataIzq: [], chartDataDer: [], historicalCount: 0, tendencia: null, predictionInfo: null };
@@ -152,38 +139,66 @@ export default function EvolucionScreen() {
       deltaDer: sorted[sorted.length - 1].anguloDer - sorted[0].anguloDer,
     } : null;
 
-    if (sorted.length < 2) {
+    if (sorted.length < 2 || !proyeccion) {
       return { lineDataIzq: dataIzq, lineDataDer: dataDer, chartDataIzq: dataIzq, chartDataDer: dataDer, historicalCount: sorted.length, tendencia: tend, predictionInfo: null };
     }
 
-    const last = sorted[sorted.length - 1];
-    const lastDate = parseDateSafe(last.fechaRadiografia || last.creadoEn);
-    let rate = TREATMENT_META[primaryTratamiento].ratePerMonth;
-    if (primaryTratamiento === 'ejercicios') rate *= complianceFactor;
+    const predIzq = proyeccion.proyeccion_izq.map(p => ({
+      value: p.angulo_proyectado,
+      label: p.label,
+      dataPointText: `${p.angulo_proyectado.toFixed(1)}°`,
+      customDataPoint: () => (
+        <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#4D6EE3', backgroundColor: 'rgba(9,13,31,0.9)' }} />
+      ),
+    }));
 
-    const gran = GRAN_CONFIG[predGranularity];
+    const predDer = proyeccion.proyeccion_der.map(p => ({
+      value: p.angulo_proyectado,
+      label: p.label,
+      dataPointText: `${p.angulo_proyectado.toFixed(1)}°`,
+      customDataPoint: () => (
+        <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#00E5CC', backgroundColor: 'rgba(9,13,31,0.9)' }} />
+      ),
+    }));
 
-    const makePred = (base: number, step: number, color: string): any => {
-      const val = Math.max(0, Math.round((base + rate * gran.toMonths(step)) * 10) / 10);
-      const d = gran.advance(lastDate, step);
-      return {
-        value: val,
-        label: d.toLocaleDateString('es-BO', { day: '2-digit', month: 'short' }),
-        dataPointText: `${val.toFixed(1)}°`,
-        customDataPoint: () => (
-          <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: color, backgroundColor: 'rgba(9,13,31,0.9)' }} />
-        ),
-      };
+    const len = proyeccion.proyeccion_izq.length;
+    const shortIdx = Math.min(1, len - 1);
+    const longIdx = len - 1;
+
+    const pShort = proyeccion.proyeccion_izq[shortIdx];
+    const pLong = proyeccion.proyeccion_izq[longIdx];
+
+    const pShortDer = proyeccion.proyeccion_der[shortIdx];
+    const pLongDer = proyeccion.proyeccion_der[longIdx];
+
+    const treatmentsLabels = proyeccion.tratamientos_activos.map(t => {
+      if (t === 'yeso') return 'Yeso Pélvico';
+      if (t === 'arnes') return 'Arnés de Pavlik';
+      if (t === 'ejercicios') return 'Ejercicios';
+      if (t === 'cirugia') return 'Quirúrgico';
+      return 'Observación';
+    }).join(' + ') || 'Observación';
+
+    const predInfo = {
+      meta: {
+        label: treatmentsLabels,
+      },
+      primaryTratamiento: proyeccion.tratamientos_activos.includes('ejercicios') ? 'ejercicios' as const : 'observacion' as const,
+      monthlyRate: proyeccion.tasa_tratamiento_mensual,
+      compliancePct: proyeccion.cumplimiento_ejercicios_pct ?? 0,
+      monthsToGoal: proyeccion.meses_para_meta,
+      alreadyNormal: proyeccion.ya_esta_sano,
+      shortLabel: pShort ? pShort.label : '',
+      longLabel: pLong ? pLong.label : '',
+      predShort: {
+        izq: pShort ? pShort.angulo_proyectado : 0,
+        der: pShortDer ? pShortDer.angulo_proyectado : 0,
+      },
+      predLong: {
+        izq: pLong ? pLong.angulo_proyectado : 0,
+        der: pLongDer ? pLongDer.angulo_proyectado : 0,
+      }
     };
-
-    const predIzq = gran.steps.map(s => makePred(last.anguloIzq, s, '#4D6EE3'));
-    const predDer  = gran.steps.map(s => makePred(last.anguloDer,  s, '#00E5CC'));
-
-    const avgCurrent = (last.anguloIzq + last.anguloDer) / 2;
-    const monthsToGoal = rate < 0 && avgCurrent > 28 ? Math.ceil((28 - avgCurrent) / rate) : null;
-
-    const shortM = gran.toMonths(gran.steps[gran.shortIdx]);
-    const longM  = gran.toMonths(gran.steps[gran.longIdx]);
 
     return {
       lineDataIzq: dataIzq,
@@ -192,20 +207,9 @@ export default function EvolucionScreen() {
       chartDataDer: [...dataDer, ...predDer],
       historicalCount: sorted.length,
       tendencia: tend,
-      predictionInfo: {
-        meta: TREATMENT_META[primaryTratamiento],
-        primaryTratamiento,
-        monthlyRate: rate,
-        compliancePct: Math.round(complianceFactor * 100),
-        monthsToGoal,
-        alreadyNormal: avgCurrent <= 28,
-        shortLabel: gran.shortLabel,
-        longLabel: gran.longLabel,
-        predShort: { izq: Math.max(0, last.anguloIzq + rate * shortM), der: Math.max(0, last.anguloDer + rate * shortM) },
-        predLong:  { izq: Math.max(0, last.anguloIzq + rate * longM),  der: Math.max(0, last.anguloDer + rate * longM)  },
-      },
+      predictionInfo: predInfo,
     };
-  }, [historial, primaryTratamiento, complianceFactor, predGranularity]);
+  }, [historial, proyeccion]);
 
   return (
     <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
