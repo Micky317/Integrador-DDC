@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassContainer } from '../../../components/GlassContainer';
 import { Colors, Typography, Spacing, Radius } from '../../../constants/theme';
-import { PrescripcionMedica } from '../../../types';
+import { PrescripcionMedica, Paciente, Analisis } from '../../../types';
+import { pdfService } from '../../../services/pdf.service';
 
 const TRATAMIENTO_META: Record<string, { label: string; color: string }> = {
   cirugia:     { label: 'Evaluación Quirúrgica', color: Colors.statusUrgent ?? '#FF4757' },
@@ -15,12 +16,17 @@ const TRATAMIENTO_META: Record<string, { label: string; color: string }> = {
 
 interface PrescripcionCardProps {
   prescripcion: PrescripcionMedica;
+  paciente?: Paciente;
+  analisis?: Analisis | null;
 }
 
 export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
   prescripcion,
+  paciente,
+  analisis,
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const fecha = new Date(prescripcion.creadoEn).toLocaleDateString('es-AR', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -31,6 +37,22 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
         day: '2-digit', month: 'short', year: 'numeric',
       })
     : null;
+
+  const handleSharePDF = async () => {
+    if (!paciente) {
+      Alert.alert('Error', 'No se pudieron cargar los datos del paciente para generar el PDF.');
+      return;
+    }
+
+    setGeneratingPdf(true);
+    try {
+      await pdfService.generarYCompartirPrescripcion(prescripcion, paciente, analisis);
+    } catch (e: any) {
+      Alert.alert('Error al generar PDF', e.message || 'Ocurrió un error inesperado al intentar compartir el PDF.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   return (
     <GlassContainer style={styles.card}>
@@ -91,6 +113,23 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
               </Text>
             </View>
           )}
+
+          {/* Botón de Compartir PDF */}
+          <TouchableOpacity
+            style={styles.pdfButton}
+            onPress={handleSharePDF}
+            disabled={generatingPdf}
+            activeOpacity={0.7}
+          >
+            {generatingPdf ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <>
+                <Ionicons name="share-social-outline" size={16} color="#FFF" />
+                <Text style={styles.pdfButtonText}>Compartir PDF Clínico</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       )}
     </GlassContainer>
@@ -174,5 +213,21 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     fontFamily: Typography.fonts.regular,
     flex: 1,
+  },
+  pdfButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    marginTop: Spacing.md,
+    gap: 8,
+  },
+  pdfButtonText: {
+    color: '#FFF',
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.fonts.semibold,
   },
 });

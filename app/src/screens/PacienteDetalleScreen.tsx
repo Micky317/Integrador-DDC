@@ -543,6 +543,8 @@ export default function PacienteDetalleScreen() {
               >
                 <PrescripcionCard
                   prescripcion={p}
+                  paciente={paciente}
+                  analisis={p.analisisId ? (historial || []).find(h => h.id === p.analisisId) : null}
                 />
               </SwipeablePrescripcionCard>
             ))
