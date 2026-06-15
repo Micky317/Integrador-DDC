@@ -44,9 +44,31 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
       return;
     }
 
+    Alert.alert(
+      'Exportar Reporte PDF',
+      '¿Deseas incluir los gráficos de evolución de caderas y la proyección de recuperación estimada en el PDF?',
+      [
+        {
+          text: 'Solo Receta',
+          onPress: () => executeSharePDF(false),
+        },
+        {
+          text: 'Incluir Gráficos',
+          onPress: () => executeSharePDF(true),
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const executeSharePDF = async (incluirGraficos: boolean) => {
     setGeneratingPdf(true);
     try {
-      await pdfService.generarYCompartirPrescripcion(prescripcion, paciente, analisis);
+      await pdfService.generarYCompartirPrescripcion(prescripcion, paciente!, analisis, incluirGraficos);
     } catch (e: any) {
       Alert.alert('Error al generar PDF', e.message || 'Ocurrió un error inesperado al intentar compartir el PDF.');
     } finally {

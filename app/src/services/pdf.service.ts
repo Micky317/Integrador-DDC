@@ -5,7 +5,148 @@ import { supabase } from '../lib/supabase';
 import { PrescripcionMedica, Paciente, Analisis } from '../types';
 import { authService } from './auth.service';
 import { historialService } from './historial.service';
-import { calcularMesesDeEdad } from '../utils/helpers';
+import { pacientesService } from './pacientes.service';
+import { calcularMesesDeEdad, parseDateSafe } from '../utils/helpers';
+
+function generateSvgChart(
+  historicalPoints: number[],
+  projectedPoints: number[],
+  idealPoints: number[],
+  labels: string[],
+  lineColor: string,
+  title: string
+): string {
+  const svgW = 500;
+  const svgH = 220;
+  const marginTop = 25;
+  const marginRight = 30;
+  const marginBottom = 35;
+  const marginLeft = 45;
+  
+  const chartW = svgW - marginLeft - marginRight;
+  const chartH = svgH - marginTop - marginBottom;
+  
+  const yMin = 15;
+  const yMax = 45;
+  
+  const getX = (index: number, total: number) => {
+    if (total <= 1) return marginLeft + chartW / 2;
+    return marginLeft + (index / (total - 1)) * chartW;
+  };
+  
+  const getY = (val: number) => {
+    const clamped = Math.max(yMin, Math.min(yMax, val));
+    return svgH - marginBottom - ((clamped - yMin) / (yMax - yMin)) * chartH;
+  };
+
+  const totalPoints = historicalPoints.length + projectedPoints.length;
+  
+  const gridLines = [20, 28, 30, 40].map(yVal => {
+    const y = getY(yVal);
+    let color = 'rgba(255,255,255,0.08)';
+    let dash = '4,4';
+    if (yVal === 28) {
+      color = 'rgba(77, 110, 227, 0.4)';
+    } else if (yVal === 30) {
+      color = 'rgba(255, 71, 87, 0.4)';
+    }
+    return `
+      <line x1="${marginLeft}" y1="${y}" x2="${svgW - marginRight}" y2="${y}" stroke="${color}" stroke-dasharray="${dash}" stroke-width="1" />
+      <text x="${marginLeft - 8}" y="${y + 3}" fill="#94a3b8" font-size="9" text-anchor="end">${yVal}°</text>
+    `;
+  }).join('');
+
+  const xLabels = labels.map((lbl, idx) => {
+    if (idx === 0 || idx === historicalPoints.length - 1 || idx === totalPoints - 1 || (idx > 0 && idx % 3 === 0)) {
+      const x = getX(idx, totalPoints);
+      return `
+        <line x1="${x}" y1="${marginTop}" x2="${x}" y2="${svgH - marginBottom}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
+        <text x="${x}" y="${svgH - marginBottom + 16}" fill="#94a3b8" font-size="8" text-anchor="middle">${lbl}</text>
+      `;
+    }
+    return '';
+  }).join('');
+
+  let idealPath = '';
+  if (idealPoints && idealPoints.length > 0) {
+    const d = idealPoints.map((val, idx) => {
+      const x = getX(idx, totalPoints);
+      const y = getY(val);
+      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
+    }).join(' ');
+    idealPath = `<path d="${d}" fill="none" stroke="rgba(0, 196, 140, 0.4)" stroke-width="1.5" stroke-dasharray="3,3" />`;
+  }
+
+  let historicalPath = '';
+  let historicalDots = '';
+  if (historicalPoints.length > 0) {
+    const d = historicalPoints.map((val, idx) => {
+      const x = getX(idx, totalPoints);
+      const y = getY(val);
+      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
+    }).join(' ');
+    
+    historicalPath = `<path d="${d}" fill="none" stroke="${lineColor}" stroke-width="3" />`;
+    
+    historicalDots = historicalPoints.map((val, idx) => {
+      const x = getX(idx, totalPoints);
+      const y = getY(val);
+      return `
+        <circle cx="${x}" cy="${y}" r="4" fill="${lineColor}" />
+        <circle cx="${x}" cy="${y}" r="2" fill="#FFFFFF" />
+        <text x="${x}" y="${y - 8}" fill="${lineColor}" font-size="8" font-weight="bold" text-anchor="middle">${val.toFixed(1)}°</text>
+      `;
+    }).join('');
+  }
+
+  let projectedPath = '';
+  let projectedDots = '';
+  if (projectedPoints.length > 0 && historicalPoints.length > 0) {
+    const fullProjPoints = [historicalPoints[historicalPoints.length - 1], ...projectedPoints];
+    const d = fullProjPoints.map((val, idx) => {
+      const x = getX(historicalPoints.length - 1 + idx, totalPoints);
+      const y = getY(val);
+      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
+    }).join(' ');
+    
+    projectedPath = `<path d="${d}" fill="none" stroke="${lineColor}" stroke-dasharray="2,2" stroke-width="2" />`;
+    
+    projectedDots = projectedPoints.map((val, idx) => {
+      const globalIdx = historicalPoints.length + idx;
+      const x = getX(globalIdx, totalPoints);
+      const y = getY(val);
+      const showDetails = idx === 0 || idx === projectedPoints.length - 1 || idx === Math.floor(projectedPoints.length / 2);
+      return showDetails ? `
+        <circle cx="${x}" cy="${y}" r="4" fill="#0f172a" stroke="${lineColor}" stroke-width="2" />
+        <text x="${x}" y="${y - 8}" fill="${lineColor}" font-size="8" font-weight="bold" text-anchor="middle">${val.toFixed(1)}°</text>
+      ` : `<circle cx="${x}" cy="${y}" r="2" fill="${lineColor}" opacity="0.6" />`;
+    }).join('');
+  }
+
+  return `
+    <svg viewBox="0 0 ${svgW} ${svgH}" width="100%" height="220" style="background-color: #0f172a; border-radius: 10px;">
+      <!-- Title -->
+      <text x="15" y="18" fill="#f8fafc" font-size="10" font-weight="600" letter-spacing="0.5">${title}</text>
+      
+      <!-- Axis -->
+      <line x1="${marginLeft}" y1="${marginTop}" x2="${marginLeft}" y2="${svgH - marginBottom}" stroke="rgba(255,255,255,0.15)" stroke-width="1" />
+      <line x1="${marginLeft}" y1="${svgH - marginBottom}" x2="${svgW - marginRight}" y2="${svgH - marginBottom}" stroke="rgba(255,255,255,0.15)" stroke-width="1" />
+      
+      <!-- Grids -->
+      ${gridLines}
+      ${xLabels}
+      
+      <!-- Paths -->
+      ${idealPath}
+      ${projectedPath}
+      ${historicalPath}
+      
+      <!-- Data Points -->
+      ${historicalDots}
+      ${projectedDots}
+    </svg>
+  `;
+}
 
 export const pdfService = {
   /**
@@ -40,9 +181,68 @@ export const pdfService = {
   async generarYCompartirPrescripcion(
     prescripcion: PrescripcionMedica,
     paciente: Paciente,
-    analisisCargado?: Analisis | null
+    analisisCargado?: Analisis | null,
+    incluirGraficos: boolean = false
   ): Promise<void> {
     try {
+      let svgChartIzqHtml = '';
+      let svgChartDerHtml = '';
+      let recoveryEstimateHtml = '';
+
+      if (incluirGraficos) {
+        try {
+          const proyeccion = await pacientesService.getProyeccionClinica(paciente.id, 'meses');
+          
+          // Obtener datos históricos completos
+          const hist = await historialService.getHistorialByPaciente(paciente.id);
+          
+          if (hist.length > 0 && proyeccion && !proyeccion.historial_vacio) {
+            const histIzq = hist.map(a => a.anguloIzq);
+            const histDer = hist.map(a => a.anguloDer);
+            
+            const projIzq = proyeccion.proyeccion_izq.map(p => p.angulo_proyectado);
+            const projDer = proyeccion.proyeccion_der.map(p => p.angulo_proyectado);
+            
+            const idealIzq = proyeccion.pronostico_inicial_izq || [];
+            const idealDer = proyeccion.pronostico_inicial_der || [];
+            
+            const labelsHist = hist.map(a => {
+              const d = a.fechaRadiografia ? parseDateSafe(a.fechaRadiografia) : new Date(a.creadoEn);
+              return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+            });
+            const labelsProj = proyeccion.proyeccion_izq.map(p => p.label);
+            const labelsAll = [...labelsHist, ...labelsProj];
+            
+            // Generar SVGs
+            const svgIzq = generateSvgChart(histIzq, projIzq, idealIzq, labelsAll, '#4D6EE3', 'Cadera Izquierda (Evolución y Proyección)');
+            const svgDer = generateSvgChart(histDer, projDer, idealDer, labelsAll, '#00E5CC', 'Cadera Derecha (Evolución y Proyección)');
+            
+            svgChartIzqHtml = `<div class="chart-box">${svgIzq}</div>`;
+            svgChartDerHtml = `<div class="chart-box">${svgDer}</div>`;
+
+            let estimateText = '';
+            if (proyeccion.ya_esta_sano) {
+              estimateText = 'Ambas caderas se encuentran actualmente dentro del rango normal (&lt;28°).';
+            } else if (proyeccion.meses_para_meta) {
+              estimateText = `Se proyecta que las caderas alcanzarán el rango normal (&lt;28°) en aproximadamente <strong>${proyeccion.meses_para_meta} meses</strong> continuando con el tratamiento activo y la constancia de ejercicios recomendada.`;
+            } else {
+              estimateText = 'Se requiere del seguimiento y carga de nuevos estudios radiográficos de control para proyectar un tiempo estimado de recuperación.';
+            }
+
+            recoveryEstimateHtml = `
+              <div class="page-break-avoid">
+                <div class="section-title">Estimación de Tiempo y Proyección de Recuperación</div>
+                <div class="recovery-box">
+                  <div class="recovery-icon">🎯</div>
+                  <div class="recovery-text">${estimateText}</div>
+                </div>
+              </div>
+            `;
+          }
+        } catch (projErr) {
+          console.warn("[PDFService] Error al obtener proyecciones para el PDF:", projErr);
+        }
+      }
       // 1. Obtener perfil del médico
       let medicoNombre = 'Médico Tratante';
       let medicoMatricula = 'No especificada';
@@ -296,6 +496,38 @@ export const pdfService = {
               letter-spacing: 0.5px;
             }
 
+            /* Contenedor de gráficos */
+            .charts-comparison {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              margin: 20px 0;
+            }
+            .chart-box {
+              padding: 10px;
+              background-color: #0f172a;
+              border-radius: 12px;
+              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            }
+            .recovery-box {
+              display: flex;
+              align-items: center;
+              gap: 15px;
+              background-color: #eff6ff;
+              border-left: 4px solid #3b82f6;
+              padding: 15px;
+              border-radius: 0 8px 8px 0;
+              margin-bottom: 25px;
+            }
+            .recovery-icon {
+              font-size: 24px;
+            }
+            .recovery-text {
+              color: #1e3a8a;
+              font-size: 13px;
+              line-height: 1.5;
+            }
+
             /* Tratamientos */
             .treatment-badges {
               margin-bottom: 15px;
@@ -465,6 +697,21 @@ export const pdfService = {
               ` : ''}
             </div>
           ` : ''}
+
+          ${(svgChartIzqHtml || svgChartDerHtml) ? `
+            <div class="page-break-avoid">
+              <div class="section-title">Gráficos de Evolución de Cadera</div>
+              <div class="charts-comparison">
+                ${svgChartIzqHtml}
+                ${svgChartDerHtml}
+              </div>
+              <div style="font-size: 10px; color: #64748b; margin-top: -10px; margin-bottom: 20px; text-align: center;">
+                Línea continua: Historial de mediciones. Línea punteada: Proyección de evolución. Línea discontinua verde: Plan ideal.
+              </div>
+            </div>
+          ` : ''}
+
+          ${recoveryEstimateHtml}
 
           <div class="page-break-avoid">
             <div class="section-title">Diagnóstico y Plan de Tratamiento</div>
