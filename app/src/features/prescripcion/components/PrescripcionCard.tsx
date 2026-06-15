@@ -44,25 +44,8 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
       return;
     }
 
-    Alert.alert(
-      'Exportar Reporte PDF',
-      '¿Deseas incluir los gráficos de evolución de caderas y la proyección de recuperación estimada en el PDF?',
-      [
-        {
-          text: 'Solo Receta',
-          onPress: () => executeSharePDF(false),
-        },
-        {
-          text: 'Incluir Gráficos',
-          onPress: () => executeSharePDF(true),
-        },
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-      ],
-      { cancelable: true }
-    );
+    const incluir = prescripcion.tratamientos.includes('incluir_graficos');
+    executeSharePDF(incluir);
   };
 
   const executeSharePDF = async (incluirGraficos: boolean) => {
@@ -85,6 +68,7 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
     });
 
     const tratamientosStr = prescripcion.tratamientos
+      .filter(t => t !== 'incluir_graficos')
       .map(t => {
         const labels: Record<string, string> = {
           cirugia: 'Evaluación Quirúrgica',
@@ -142,9 +126,9 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
         </View>
 
         {/* Tratamientos (siempre visibles) */}
-        {prescripcion.tratamientos.length > 0 && (
+        {prescripcion.tratamientos.filter(t => t !== 'incluir_graficos').length > 0 && (
           <View style={styles.chips}>
-            {prescripcion.tratamientos.map(t => {
+            {prescripcion.tratamientos.filter(t => t !== 'incluir_graficos').map(t => {
               const meta = TRATAMIENTO_META[t];
               return (
                 <View key={t} style={[styles.chip, { borderColor: meta?.color ?? Colors.borderDefault }]}>

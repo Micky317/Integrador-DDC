@@ -302,10 +302,12 @@ export const pdfService = {
         observacion: 'Observación Controlada',
       };
       
-      const listaTratamientosHtml = prescripcion.tratamientos.map(t => {
-        const label = TRATAMIENTOS_DICT[t] || t;
-        return `<span class="treatment-badge badge-${t}">${label}</span>`;
-      }).join(' ');
+      const listaTratamientosHtml = prescripcion.tratamientos
+        .filter(t => t !== 'incluir_graficos')
+        .map(t => {
+          const label = TRATAMIENTOS_DICT[t] || t;
+          return `<span class="treatment-badge badge-${t}">${label}</span>`;
+        }).join(' ');
 
       // 6. Generar el contenido HTML premium
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=https://pasitos-firmes.ddc/prescripcion/${prescripcion.id}`;

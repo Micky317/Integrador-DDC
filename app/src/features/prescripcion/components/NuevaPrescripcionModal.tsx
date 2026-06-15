@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,6 +55,7 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
   const [proximaRevision, setProximaRevision] = useState('');
   const [tratamientos, setTratamientos] = useState<string[]>(tratamientosActuales || []);
   const [selectedAnalisisId, setSelectedAnalisisId] = useState<string | undefined>(undefined);
+  const [incluirGraficos, setIncluirGraficos] = useState(true);
 
   // Estados para el DatePicker nativo
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -74,6 +76,7 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
       setIndicaciones('');
       setProximaRevision('');
       setSelectedDate(null);
+      setIncluirGraficos(true);
 
       // Pre-llenar con el último análisis por defecto si existe
       if (historialAnalisis && historialAnalisis.length > 0) {
@@ -124,9 +127,14 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
 
   const handleGuardar = () => {
     if (!diagnostico.trim()) return;
+
+    const finalTratamientos = incluirGraficos
+      ? [...tratamientos, 'incluir_graficos']
+      : tratamientos.filter(t => t !== 'incluir_graficos');
+
     onGuardar({
       diagnosticoResumen: diagnostico.trim(),
-      tratamientos,
+      tratamientos: finalTratamientos,
       indicaciones: indicaciones.trim() || undefined,
       proximaRevision: proximaRevision.trim() || undefined,
       analisisId: selectedAnalisisId,
@@ -302,6 +310,23 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
               </View>
             )}
 
+            {/* Opción de incluir gráficos en el PDF */}
+            <View style={styles.switchContainer}>
+              <View style={styles.switchTextContainer}>
+                <Text style={styles.switchLabel}>Incluir Gráficos de Evolución</Text>
+                <Text style={styles.switchDesc}>
+                  Adjunta el gráfico con la proyección de recuperación en el reporte PDF.
+                </Text>
+              </View>
+              <Switch
+                value={incluirGraficos}
+                onValueChange={setIncluirGraficos}
+                trackColor={{ false: '#2C3550', true: Colors.primary }}
+                thumbColor={Platform.OS === 'ios' ? undefined : incluirGraficos ? '#FFF' : '#A0AEC0'}
+              />
+            </View>
+
+
             <PrimaryButton
               title="Emitir Prescripción"
               onPress={handleGuardar}
@@ -441,5 +466,31 @@ const styles = StyleSheet.create({
   },
   clearDateBtn: {
     padding: 2,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    marginTop: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  switchTextContainer: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  switchLabel: {
+    color: '#FFF',
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.fonts.semibold,
+  },
+  switchDesc: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontFamily: Typography.fonts.regular,
+    marginTop: 2,
   },
 });
