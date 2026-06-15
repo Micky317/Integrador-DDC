@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator, Animated, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator, Animated, PanResponder, Linking, Share } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,9 @@ import { AnalisisHistorialCard } from '../features/pacientes/components/Analisis
 import { RevisionVideoModal } from '../features/rehabilitacion/components/RevisionVideoModal';
 import { PrescripcionCard } from '../features/prescripcion/components/PrescripcionCard';
 import { NuevaPrescripcionModal } from '../features/prescripcion/components/NuevaPrescripcionModal';
+import QRCode from 'react-native-qrcode-svg';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { usePacienteDetalle, useEliminarPaciente, useActualizarTratamiento } from '../features/pacientes/hooks/usePacienteDetalle';
 import { useVinculosPadre } from '../features/padres/hooks/useVinculos';
 import { useRehabilitacion } from '../features/rehabilitacion/hooks/useRehabilitacion';
@@ -161,6 +164,60 @@ export default function PacienteDetalleScreen() {
   const [showRehabModal, setShowRehabModal] = useState(false);
   const [showPrescripcionModal, setShowPrescripcionModal] = useState(false);
   const [tempTratamientos, setTempTratamientos] = useState<string[]>([]);
+  const [showLinkingModal, setShowLinkingModal] = useState(false);
+  const qrRef = React.useRef<any>(null);
+
+  const handleShareLinkingCode = async () => {
+    if (!paciente || !qrRef.current) return;
+    
+    try {
+      qrRef.current.toDataURL(async (data: string) => {
+        const base64Data = data.replace(/^data:image\/png;base64,/, '');
+        const tempUri = `${FileSystem.cacheDirectory}DDC-${paciente.codigoPaciente}.png`;
+        
+        try {
+          await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+            encoding: 'base64',
+          });
+
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(tempUri, {
+              mimeType: 'image/png',
+              dialogTitle: 'Compartir Código de Vinculación',
+              UTI: 'public.png'
+            });
+          } else {
+            await Share.share({
+              message: `¡Hola! Descarga la app DDC Pasitos Firmes y usa este código de vinculación para ver los resultados de tu bebé: ${paciente.codigoPaciente}`,
+            });
+          }
+        } catch (err) {
+          console.error("FileSystem Error:", err);
+        }
+      });
+    } catch (error) {
+      console.log('Error sharing image', error);
+    }
+  };
+
+  const handleWhatsAppLinkingShare = () => {
+    if (!paciente) return;
+    
+    const parentPhone = paciente.telefonoContacto ? paciente.telefonoContacto.replace(/\D/g, '') : '';
+    const message = `¡Hola! Le comparto el código de vinculación para la aplicación DDC Pasitos Firmes de su bebé: *${paciente.codigoPaciente}*. Úselo para ver las radiografías, análisis y evoluciones médicas.`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    let url = '';
+    if (parentPhone) {
+      url = `https://wa.me/${parentPhone}?text=${encodedMessage}`;
+    } else {
+      url = `https://wa.me/?text=${encodedMessage}`;
+    }
+    
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir WhatsApp en este dispositivo.');
+    });
+  };
 
   const handleOpenPlanModal = () => {
     setTempTratamientos(paciente?.tratamientosAsignados || []);
@@ -333,7 +390,16 @@ export default function PacienteDetalleScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.profileName}>{paciente.nombreCompleto}</Text>
-                <Text style={styles.profileMeta}>{calcularMesesDeEdad(paciente.fechaNacimiento)} meses · {paciente.codigoPaciente}</Text>
+                <TouchableOpacity 
+                  onPress={() => setShowLinkingModal(true)} 
+                  style={styles.metaClickable}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.profileMeta}>
+                    {calcularMesesDeEdad(paciente.fechaNacimiento)} meses · {paciente.codigoPaciente}
+                  </Text>
+                  <Ionicons name="qr-code-outline" size={13} color={Colors.primary} style={{ marginLeft: 5 }} />
+                </TouchableOpacity>
               </View>
               {paciente.estadoGraf && <GrafBadge estado={paciente.estadoGraf} />}
             </GlassContainer>
@@ -717,6 +783,60 @@ export default function PacienteDetalleScreen() {
             }}
           />
         )}
+
+        {/* Modal de Vinculación Familiar QR */}
+        {showLinkingModal && paciente && (
+          <Modal
+            visible={showLinkingModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowLinkingModal(false)}
+          >
+            <View style={styles.modalOverlayCentered}>
+              <View style={styles.modalCard}>
+                <TouchableOpacity 
+                  style={styles.closeBtn} 
+                  onPress={() => setShowLinkingModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                </TouchableOpacity>
+                
+                <Ionicons name="people-circle" size={48} color={Colors.primary} style={{ alignSelf: 'center', marginBottom: 12 }} />
+                <Text style={styles.modalTitle}>Vincular Familiar</Text>
+                <Text style={styles.modalDesc}>
+                  El tutor o tutor familiar puede escanear este código QR para vincularse al expediente de {paciente.nombreCompleto}.
+                </Text>
+
+                <View style={styles.qrContainer}>
+                  <QRCode
+                    getRef={(c) => (qrRef.current = c)}
+                    value={paciente.codigoPaciente}
+                    size={180}
+                    color={Colors.bgDeep}
+                    backgroundColor="#FFFFFF"
+                  />
+                </View>
+
+                <Text style={styles.codigoText}>{paciente.codigoPaciente}</Text>
+
+                <View style={styles.modalBtns}>
+                  <View style={styles.shareRow}>
+                    <TouchableOpacity style={styles.shareBtn} onPress={handleShareLinkingCode}>
+                      <Ionicons name="share-social-outline" size={20} color={Colors.primary} />
+                      <Text style={styles.shareBtnText}>Compartir</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.shareBtn, styles.whatsappBtn]} onPress={handleWhatsAppLinkingShare}>
+                      <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                      <Text style={[styles.shareBtnText, { color: '#25D366' }]}>WhatsApp</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
     </LinearGradient>
   );
 }
@@ -816,4 +936,16 @@ const styles = StyleSheet.create({
   intentoPlayBtn: { padding: 6 },
   intentoDeleteBtn: { padding: 6 },
   sinIntentosText: { color: Colors.textMuted, fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
+  metaClickable: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  modalOverlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  modalCard: { backgroundColor: Colors.bgCard, borderRadius: Radius.xl, padding: Spacing.xl, width: '100%', alignItems: 'center' },
+  closeBtn: { position: 'absolute', top: Spacing.md, right: Spacing.md, padding: 4 },
+  modalDesc: { color: Colors.textSecondary, fontSize: Typography.size.sm, textAlign: 'center', marginBottom: Spacing.xl, lineHeight: 18 },
+  qrContainer: { padding: 16, backgroundColor: '#FFF', borderRadius: Radius.lg, marginBottom: 12 },
+  codigoText: { color: Colors.primary, fontSize: Typography.size.xl, fontWeight: Typography.weight.bold, letterSpacing: 2, marginBottom: Spacing.xl },
+  whatsappBtn: { borderColor: '#25D366' },
+  shareRow: { flexDirection: 'row', gap: Spacing.md, width: '100%' },
+  shareBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 12 },
+  shareBtnText: { color: Colors.primary, fontWeight: Typography.weight.semibold },
+  modalBtns: { gap: Spacing.sm, width: '100%' },
 });

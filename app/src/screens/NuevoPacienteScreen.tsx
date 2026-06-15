@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Share, Linking, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +49,25 @@ export default function NuevoPacienteScreen() {
     } catch (error) {
       console.log('Error sharing image', error);
     }
+  };
+
+  const handleWhatsAppShare = () => {
+    if (!state.successData?.codigo) return;
+    
+    const parentPhone = state.telefono.replace(/\D/g, '');
+    const message = `¡Hola! Le comparto el código de vinculación para la aplicación DDC Pasitos Firmes de su bebé: *${state.successData.codigo}*. Úselo para ver las radiografías, análisis y evoluciones médicas.`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    let url = '';
+    if (parentPhone) {
+      url = `https://wa.me/${parentPhone}?text=${encodedMessage}`;
+    } else {
+      url = `https://wa.me/?text=${encodedMessage}`;
+    }
+    
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir WhatsApp en este dispositivo.');
+    });
   };
 
   return (
@@ -179,15 +198,22 @@ export default function NuevoPacienteScreen() {
             <Text style={styles.codigoText}>{state.successData?.codigo}</Text>
 
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-                <Ionicons name="share-social-outline" size={20} color={Colors.primary} />
-                <Text style={styles.shareBtnText}>Compartir</Text>
-              </TouchableOpacity>
+              <View style={styles.shareRow}>
+                <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                  <Ionicons name="share-social-outline" size={20} color={Colors.primary} />
+                  <Text style={styles.shareBtnText}>Compartir</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.shareBtn, styles.whatsappBtn]} onPress={handleWhatsAppShare}>
+                  <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                  <Text style={[styles.shareBtnText, { color: '#25D366' }]}>WhatsApp</Text>
+                </TouchableOpacity>
+              </View>
 
               <PrimaryButton
                 title="Ir a Análisis"
                 onPress={proceedToFeature}
-                style={{ flex: 1 }}
+                style={{ width: '100%' }}
               />
             </View>
           </View>
@@ -225,7 +251,9 @@ const styles = StyleSheet.create({
   modalDesc: { color: Colors.textSecondary, fontSize: Typography.size.sm, textAlign: 'center', marginBottom: Spacing.xl },
   qrContainer: { padding: 16, backgroundColor: '#FFF', borderRadius: Radius.lg, marginBottom: 12 },
   codigoText: { color: Colors.primary, fontSize: Typography.size.xl, fontWeight: Typography.weight.bold, letterSpacing: 2, marginBottom: Spacing.xl },
-  modalBtns: { flexDirection: 'row', gap: Spacing.md, width: '100%' },
+  modalBtns: { gap: Spacing.sm, width: '100%' },
+  shareRow: { flexDirection: 'row', gap: Spacing.md, width: '100%', marginBottom: Spacing.xs },
   shareBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 12 },
+  whatsappBtn: { borderColor: '#25D366' },
   shareBtnText: { color: Colors.primary, fontWeight: Typography.weight.semibold },
 });
