@@ -38,7 +38,7 @@ interface NuevaPrescripcionModalProps {
   }) => void;
   isLoading: boolean;
   tratamientosActuales: string[];
-  ultimoAnalisis?: Analisis | null;
+  historialAnalisis?: Analisis[];
 }
 
 export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
@@ -47,39 +47,55 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
   onGuardar,
   isLoading,
   tratamientosActuales,
-  ultimoAnalisis,
+  historialAnalisis,
 }) => {
   const [diagnostico, setDiagnostico] = useState('');
   const [indicaciones, setIndicaciones] = useState('');
   const [proximaRevision, setProximaRevision] = useState('');
   const [tratamientos, setTratamientos] = useState<string[]>([]);
-  const [vincularAnalisis, setVincularAnalisis] = useState(true);
+  const [selectedAnalisisId, setSelectedAnalisisId] = useState<string | undefined>(undefined);
 
   // Estados para el DatePicker nativo
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  const preFillDiagnosis = (a: Analisis) => {
+    const dx = [
+      a.diagnosticoIzq !== 'NORMAL' ? `Cadera izq: ${a.diagnosticoIzq}` : '',
+      a.diagnosticoDer !== 'NORMAL' ? `Cadera der: ${a.diagnosticoDer}` : '',
+    ].filter(Boolean).join(', ');
+    const graf = a.categoriaGraf?.replace('GRAF_', 'Graf ') ?? '';
+    setDiagnostico(dx ? `${dx} — ${graf}` : graf);
+  };
+
   useEffect(() => {
     if (visible) {
       setTratamientos(tratamientosActuales);
-
-      // Pre-llenar diagnóstico con el último análisis si existe
-      if (ultimoAnalisis) {
-        const dx = [
-          ultimoAnalisis.diagnosticoIzq !== 'NORMAL' ? `Cadera izq: ${ultimoAnalisis.diagnosticoIzq}` : '',
-          ultimoAnalisis.diagnosticoDer !== 'NORMAL' ? `Cadera der: ${ultimoAnalisis.diagnosticoDer}` : '',
-        ].filter(Boolean).join(', ');
-        const graf = ultimoAnalisis.categoriaGraf?.replace('_', ' ') ?? '';
-        setDiagnostico(dx ? `${dx} — ${graf}` : graf);
-      } else {
-        setDiagnostico('');
-      }
       setIndicaciones('');
       setProximaRevision('');
       setSelectedDate(null);
-      setVincularAnalisis(true);
+
+      // Pre-llenar con el último análisis por defecto si existe
+      if (historialAnalisis && historialAnalisis.length > 0) {
+        const latest = historialAnalisis[historialAnalisis.length - 1];
+        setSelectedAnalisisId(latest.id);
+        preFillDiagnosis(latest);
+      } else {
+        setSelectedAnalisisId(undefined);
+        setDiagnostico('');
+      }
     }
   }, [visible]);
+
+  // Actualizar diagnóstico dinámicamente al cambiar de análisis seleccionado
+  useEffect(() => {
+    if (selectedAnalisisId && historialAnalisis) {
+      const match = historialAnalisis.find(a => a.id === selectedAnalisisId);
+      if (match) {
+        preFillDiagnosis(match);
+      }
+    }
+  }, [selectedAnalisisId]);
 
   const handleDateChange = (event: any, date?: Date) => {
     if (Platform.OS === 'android') {
@@ -93,7 +109,6 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
         setShowDatePicker(false);
       }
     } else {
-      // Para iOS (donde el picker puede estar inline o spinner persistente)
       if (date) {
         setSelectedDate(date);
         setProximaRevision(date.toISOString().split('T')[0]);
@@ -114,7 +129,7 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
       tratamientos,
       indicaciones: indicaciones.trim() || undefined,
       proximaRevision: proximaRevision.trim() || undefined,
-      analisisId: vincularAnalisis && ultimoAnalisis ? ultimoAnalisis.id : undefined,
+      analisisId: selectedAnalisisId,
     });
   };
 
@@ -235,18 +250,56 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
             )}
 
             {/* Vincular análisis */}
-            {ultimoAnalisis && (
-              <TouchableOpacity
-                style={styles.checkRow}
-                onPress={() => setVincularAnalisis(v => !v)}
-              >
-                <View style={[styles.checkbox, vincularAnalisis && styles.checkboxActive]}>
-                  {vincularAnalisis && <Ionicons name="checkmark" size={12} color="#FFF" />}
-                </View>
-                <Text style={styles.checkLabel}>
-                  Vincular al último análisis ({new Date(ultimoAnalisis.creadoEn).toLocaleDateString('es-AR')})
-                </Text>
-              </TouchableOpacity>
+            {historialAnalisis && historialAnalisis.length > 0 && (
+              <View style={{ marginTop: Spacing.md }}>
+                <Text style={styles.label}>Vincular Análisis Radiográfico</Text>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.analisisSelector}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.analisisOption,
+                      !selectedAnalisisId && styles.analisisOptionActive
+                    ]}
+                    onPress={() => setSelectedAnalisisId(undefined)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close-circle-outline" size={14} color={!selectedAnalisisId ? '#FFF' : Colors.textMuted} />
+                    <Text style={[styles.analisisOptionText, !selectedAnalisisId && styles.analisisOptionTextActive]}>
+                      Ninguno
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {[...historialAnalisis].reverse().map(a => {
+                    const isSelected = selectedAnalisisId === a.id;
+                    const dateStr = a.fechaRadiografia 
+                      ? new Date(a.fechaRadiografia + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+                      : new Date(a.creadoEn).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+                    return (
+                      <TouchableOpacity
+                        key={a.id}
+                        style={[
+                          styles.analisisOption,
+                          isSelected && styles.analisisOptionActive
+                        ]}
+                        onPress={() => setSelectedAnalisisId(a.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons 
+                          name="image-outline" 
+                          size={14} 
+                          color={isSelected ? '#FFF' : Colors.primary} 
+                        />
+                        <Text style={[styles.analisisOptionText, isSelected && styles.analisisOptionTextActive]}>
+                          Placa: {dateStr} ({a.anguloIzq.toFixed(0)}° / {a.anguloDer.toFixed(0)}°)
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             )}
 
             <PrimaryButton
@@ -338,31 +391,33 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.xs,
     fontFamily: Typography.fonts.medium,
   },
-  checkRow: {
+  analisisSelector: {
+    gap: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+  },
+  analisisOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
     borderColor: Colors.borderDefault,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: Radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  checkboxActive: {
+  analisisOptionActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
-  checkLabel: {
-    color: Colors.textSecondary,
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.fonts.regular,
-    flex: 1,
+  analisisOptionText: {
+    color: Colors.textMuted,
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.fonts.medium,
+  },
+  analisisOptionTextActive: {
+    color: '#FFF',
   },
   btn: {
     marginTop: Spacing.lg,

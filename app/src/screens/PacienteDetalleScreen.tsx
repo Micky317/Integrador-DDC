@@ -705,7 +705,7 @@ export default function PacienteDetalleScreen() {
           onClose={() => setShowPrescripcionModal(false)}
           isLoading={isCreating}
           tratamientosActuales={paciente?.tratamientosAsignados ?? []}
-          ultimoAnalisis={historial && historial.length > 0 ? historial[historial.length - 1] : null}
+          historialAnalisis={historial || []}
           onGuardar={(payload) => {
             crearPrescripcion({
               pacienteId: id ?? '',

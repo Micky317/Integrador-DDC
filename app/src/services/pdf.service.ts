@@ -66,12 +66,16 @@ export const pdfService = {
         }
       }
 
-      // 3. Descargar y codificar imagen a base64 para evitar bloqueos de red o CORS en el PDF
-      let imageBase64: string | null = null;
-      if (analisis && (analisis.imagenAnotadaUrl || analisis.imagenOriginalUrl)) {
-        const imgUrl = analisis.imagenAnotadaUrl || analisis.imagenOriginalUrl;
-        if (imgUrl) {
-          imageBase64 = await this.downloadImageAsBase64(imgUrl);
+      // 3. Descargar y codificar imágenes a base64 para evitar bloqueos de red o CORS en el PDF
+      let originalBase64: string | null = null;
+      let annotatedBase64: string | null = null;
+      
+      if (analisis) {
+        if (analisis.imagenOriginalUrl) {
+          originalBase64 = await this.downloadImageAsBase64(analisis.imagenOriginalUrl);
+        }
+        if (analisis.imagenAnotadaUrl) {
+          annotatedBase64 = await this.downloadImageAsBase64(analisis.imagenAnotadaUrl);
         }
       }
 
@@ -256,29 +260,40 @@ export const pdfService = {
               border-radius: 12px;
             }
 
-            /* Radiografía anotada */
-            .xray-container {
-              text-align: center;
+            /* Contenedor de imágenes comparativas */
+            .xrays-comparison {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
               margin: 20px 0;
-              padding: 15px;
-              background-color: #0f172a;
-              border-radius: 12px;
+            }
+            .xrays-comparison.single {
+              grid-template-columns: 1fr;
+              max-width: 320px;
+              margin: 20px auto;
+            }
+            .xray-box {
+              text-align: center;
+              padding: 12px;
+              background-color: #0f172a; /* Fondo oscuro radiografía */
+              border-radius: 10px;
               box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-              display: inline-block;
-              width: calc(100% - 30px);
             }
-            .xray-image {
+            .xray-box img {
               max-width: 100%;
-              max-height: 280px;
-              border-radius: 8px;
+              max-height: 220px;
+              border-radius: 6px;
               border: 1px solid rgba(255,255,255,0.1);
+              object-fit: contain;
             }
-            .xray-caption {
+            .xray-box p {
               color: #94a3b8;
               font-size: 10px;
-              margin-top: 8px;
+              margin-top: 6px;
               margin-bottom: 0;
-              font-style: italic;
+              font-weight: 500;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
             }
 
             /* Tratamientos */
@@ -432,10 +447,20 @@ export const pdfService = {
                 </tbody>
               </table>
 
-              ${imageBase64 ? `
-                <div class="xray-container">
-                  <img class="xray-image" src="${imageBase64}" alt="Radiografía Anotada" />
-                  <p class="xray-caption">Anotación de líneas de referencia de Graf e índices acetabulares generados por IA (YOLOv8) el ${new Date(analisis.creadoEn).toLocaleDateString('es-BO')}.</p>
+              ${(originalBase64 || annotatedBase64) ? `
+                <div class="xrays-comparison ${(originalBase64 && annotatedBase64) ? '' : 'single'}">
+                  ${originalBase64 ? `
+                    <div class="xray-box">
+                      <img src="${originalBase64}" alt="Radiografía Original" />
+                      <p>Radiografía Original</p>
+                    </div>
+                  ` : ''}
+                  ${annotatedBase64 ? `
+                    <div class="xray-box">
+                      <img src="${annotatedBase64}" alt="Análisis IA" />
+                      <p>Análisis IA (Líneas de Graf)</p>
+                    </div>
+                  ` : ''}
                 </div>
               ` : ''}
             </div>
