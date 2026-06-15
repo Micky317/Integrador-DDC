@@ -700,21 +700,23 @@ export default function PacienteDetalleScreen() {
         )}
 
         {/* Modal de Nueva Prescripción Médica */}
-        <NuevaPrescripcionModal
-          visible={showPrescripcionModal}
-          onClose={() => setShowPrescripcionModal(false)}
-          isLoading={isCreating}
-          tratamientosActuales={paciente?.tratamientosAsignados ?? []}
-          historialAnalisis={historial || []}
-          onGuardar={(payload) => {
-            crearPrescripcion({
-              pacienteId: id ?? '',
-              medicoId: user?.id ?? '',
-              ...payload,
-            });
-            setShowPrescripcionModal(false);
-          }}
-        />
+        {showPrescripcionModal && (
+          <NuevaPrescripcionModal
+            visible={showPrescripcionModal}
+            onClose={() => setShowPrescripcionModal(false)}
+            isLoading={isCreating}
+            tratamientosActuales={paciente?.tratamientosAsignados ?? []}
+            historialAnalisis={historial || []}
+            onGuardar={(payload) => {
+              crearPrescripcion({
+                pacienteId: id ?? '',
+                medicoId: user?.id ?? '',
+                ...payload,
+              });
+              setShowPrescripcionModal(false);
+            }}
+          />
+        )}
     </LinearGradient>
   );
 }

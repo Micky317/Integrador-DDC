@@ -52,7 +52,7 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
   const [diagnostico, setDiagnostico] = useState('');
   const [indicaciones, setIndicaciones] = useState('');
   const [proximaRevision, setProximaRevision] = useState('');
-  const [tratamientos, setTratamientos] = useState<string[]>([]);
+  const [tratamientos, setTratamientos] = useState<string[]>(tratamientosActuales || []);
   const [selectedAnalisisId, setSelectedAnalisisId] = useState<string | undefined>(undefined);
 
   // Estados para el DatePicker nativo
@@ -70,7 +70,7 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
 
   useEffect(() => {
     if (visible) {
-      setTratamientos(tratamientosActuales);
+      setTratamientos(tratamientosActuales || []);
       setIndicaciones('');
       setProximaRevision('');
       setSelectedDate(null);
@@ -85,7 +85,7 @@ export const NuevaPrescripcionModal: React.FC<NuevaPrescripcionModalProps> = ({
         setDiagnostico('');
       }
     }
-  }, [visible]);
+  }, [visible, tratamientosActuales, historialAnalisis]);
 
   // Actualizar diagnóstico dinámicamente al cambiar de análisis seleccionado
   useEffect(() => {
