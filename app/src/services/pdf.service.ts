@@ -6,7 +6,7 @@ import { PrescripcionMedica, Paciente, Analisis } from '../types';
 import { authService } from './auth.service';
 import { historialService } from './historial.service';
 import { pacientesService } from './pacientes.service';
-import { calcularMesesDeEdad, parseDateSafe } from '../utils/helpers';
+import { calcularMesesDeEdad, parseDateSafe, formatRecoveryTime } from '../utils/helpers';
 
 function generateSvgChart(
   historicalPoints: number[],
@@ -225,10 +225,8 @@ export const pdfService = {
               estimateText = 'Ambas caderas se encuentran actualmente dentro del rango normal (&lt;28°).';
             } else if (proyeccion.meses_para_meta) {
               const meses = proyeccion.meses_para_meta;
-              const dias = Math.round(meses * 30.44);
-              const diasTexto = `${dias} días`;
-              const mesesTexto = meses === 1 ? '1 mes' : `${meses} meses`;
-              estimateText = `Se proyecta que las caderas alcanzarán el rango normal (&lt;28°) en aproximadamente <strong>${mesesTexto} (equivalente a ~${diasTexto})</strong> continuando con el tratamiento activo y la constancia de ejercicios recomendada.`;
+              const timeText = formatRecoveryTime(meses);
+              estimateText = `Se proyecta que las caderas alcanzarán el rango normal (&lt;28°) en aproximadamente <strong>${timeText}</strong> continuando con el tratamiento activo y la constancia de ejercicios recomendada.`;
             } else {
               estimateText = 'Se requiere del seguimiento y carga de nuevos estudios radiográficos de control para proyectar un tiempo estimado de recuperación.';
             }
@@ -237,7 +235,6 @@ export const pdfService = {
               <div class="page-break-avoid">
                 <div class="section-title">Estimación de Tiempo y Proyección de Recuperación</div>
                 <div class="recovery-box">
-                  <div class="recovery-icon">🎯</div>
                   <div class="recovery-text">${estimateText}</div>
                 </div>
               </div>

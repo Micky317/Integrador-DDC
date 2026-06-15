@@ -54,3 +54,25 @@ export const parseDateSafe = (dateStr?: string | null): Date => {
   return new Date(dateStr);
 };
 
+/**
+ * Formatea el tiempo de recuperación de meses (float) a una cadena amigable
+ * mostrando meses y días correspondientes.
+ */
+export const formatRecoveryTime = (months: number): string => {
+  const totalDays = Math.round(months * 30.44);
+  if (totalDays <= 0) return '0 días';
+  if (totalDays < 30) {
+    return `${totalDays} ${totalDays === 1 ? 'día' : 'días'}`;
+  }
+  const m = Math.floor(totalDays / 30);
+  const d = totalDays % 30;
+
+  if (m === 0) {
+    return `${d} ${d === 1 ? 'día' : 'días'}`;
+  }
+  if (d === 0) {
+    return `${m} ${m === 1 ? 'mes' : 'meses'}`;
+  }
+  return `${m} ${m === 1 ? 'mes' : 'meses'} y ${d} ${d === 1 ? 'día' : 'días'}`;
+};
+

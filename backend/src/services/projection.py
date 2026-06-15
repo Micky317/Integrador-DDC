@@ -449,17 +449,18 @@ def generate_patient_projection(paciente_id: str, granularity: str = "meses") ->
         if not already_normal:
             sim_izq = y0_izq
             sim_der = y0_der
-            for m in range(1, 48):  # Simular hasta 4 años si es necesario
-                x_test = x0 + m
+            dt = 1.0 / 30.44
+            for d in range(1, 1461):  # Simular hasta 4 años (48 meses) día a día
+                x_test = x0 + (d * dt)
                 f_age_test = get_age_calcification_factor(x_test)
-                std_growth_test = get_standard_angle(x_test) - get_standard_angle(x0 + m - 1)
-                treatment_test = (effective_rate * f_age_test * gamma) * 1.0
+                std_growth_test = get_standard_angle(x_test) - get_standard_angle(x0 + ((d - 1) * dt))
+                treatment_test = (effective_rate * f_age_test * gamma) * dt
                 
                 sim_izq = max(0.0, sim_izq + std_growth_test + treatment_test)
                 sim_der = max(0.0, sim_der + std_growth_test + treatment_test)
                 
                 if (sim_izq + sim_der) / 2.0 <= 28.0:
-                    months_to_goal = m
+                    months_to_goal = round(d / 30.44, 4)
                     break
                     
         return {
