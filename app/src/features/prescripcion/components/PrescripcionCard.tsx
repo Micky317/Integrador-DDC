@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassContainer } from '../../../components/GlassContainer';
 import { Colors, Typography, Spacing, Radius } from '../../../constants/theme';
@@ -76,6 +76,46 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
     }
   };
 
+  const handleWhatsAppPrescripcionShare = () => {
+    if (!paciente) return;
+
+    const parentPhone = paciente.telefonoContacto ? paciente.telefonoContacto.replace(/\D/g, '') : '';
+    const fecha = new Date(prescripcion.creadoEn).toLocaleDateString('es-AR', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    });
+
+    const tratamientosStr = prescripcion.tratamientos
+      .map(t => {
+        const labels: Record<string, string> = {
+          cirugia: 'Evaluación Quirúrgica',
+          yeso: 'Yeso Pélvico',
+          arnes: 'Arnés de Pavlik',
+          ejercicios: 'Ejercicios',
+          observacion: 'Observación Controlada',
+        };
+        return `- ${labels[t] || t}`;
+      })
+      .join('\n');
+
+    const message = `¡Hola! Le comparto la prescripción médica emitida el *${fecha}* para su bebé *${paciente.nombreCompleto}*:\n\n` +
+      `*Diagnóstico:* ${prescripcion.diagnosticoResumen}\n\n` +
+      `*Tratamiento Asignado:*\n${tratamientosStr}\n\n` +
+      (prescripcion.indicaciones ? `*Indicaciones:* ${prescripcion.indicaciones}\n\n` : '') +
+      `Puede consultar el expediente médico y la receta digital firmada aquí: https://pasitos-firmes.ddc/prescripcion/${prescripcion.id}`;
+
+    const encodedMessage = encodeURIComponent(message);
+    let url = '';
+    if (parentPhone) {
+      url = `https://wa.me/${parentPhone}?text=${encodedMessage}`;
+    } else {
+      url = `https://wa.me/?text=${encodedMessage}`;
+    }
+
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir WhatsApp en este dispositivo.');
+    });
+  };
+
   return (
     <GlassContainer style={styles.card}>
       <TouchableOpacity onPress={() => setExpanded(e => !e)} activeOpacity={0.85}>
@@ -136,22 +176,33 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
             </View>
           )}
 
-          {/* Botón de Compartir PDF */}
-          <TouchableOpacity
-            style={styles.pdfButton}
-            onPress={handleSharePDF}
-            disabled={generatingPdf}
-            activeOpacity={0.7}
-          >
-            {generatingPdf ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <>
-                <Ionicons name="share-social-outline" size={16} color="#FFF" />
-                <Text style={styles.pdfButtonText}>Compartir PDF Clínico</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Botones de Compartir PDF y WhatsApp */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.pdfButton}
+              onPress={handleSharePDF}
+              disabled={generatingPdf}
+              activeOpacity={0.7}
+            >
+              {generatingPdf ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="document-text-outline" size={15} color="#FFF" />
+                  <Text style={styles.pdfButtonText} numberOfLines={1}>Compartir PDF</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.whatsappButton}
+              onPress={handleWhatsAppPrescripcionShare}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="logo-whatsapp" size={15} color="#FFF" />
+              <Text style={styles.whatsappButtonText} numberOfLines={1}>Enviar WhatsApp</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </GlassContainer>
@@ -236,20 +287,41 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.regular,
     flex: 1,
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
   pdfButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
     paddingVertical: 10,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.xs,
     borderRadius: Radius.md,
-    marginTop: Spacing.md,
-    gap: 8,
+    gap: 6,
   },
   pdfButtonText: {
     color: '#FFF',
-    fontSize: Typography.size.sm,
+    fontSize: 12,
+    fontFamily: Typography.fonts.semibold,
+  },
+  whatsappButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#25D366',
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.xs,
+    borderRadius: Radius.md,
+    gap: 6,
+  },
+  whatsappButtonText: {
+    color: '#FFF',
+    fontSize: 12,
     fontFamily: Typography.fonts.semibold,
   },
 });
