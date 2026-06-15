@@ -368,8 +368,16 @@ def generate_patient_projection(paciente_id: str, granularity: str = "meses") ->
             # Efecto del tratamiento en este micro-intervalo
             treatment_effect = (effective_rate * f_age * gamma) * dt
             
-            current_izq = max(0.0, current_izq + std_growth + treatment_effect)
-            current_der = max(0.0, current_der + std_growth + treatment_effect)
+            # Estabilización clínica: Si la cadera alcanza el rango sano (<28°), el tratamiento cesa y sigue el desarrollo normal
+            if current_izq > 28.0:
+                current_izq = max(0.0, current_izq + std_growth + treatment_effect)
+            else:
+                current_izq = max(0.0, current_izq + std_growth)
+                
+            if current_der > 28.0:
+                current_der = max(0.0, current_der + std_growth + treatment_effect)
+            else:
+                current_der = max(0.0, current_der + std_growth)
             
             future_date = advance_days(base_dt, step)
             future_date_str = future_date.strftime("%Y-%m-%d")
@@ -413,7 +421,10 @@ def generate_patient_projection(paciente_id: str, granularity: str = "meses") ->
                 f_age_tmp = get_age_calcification_factor(curr_x + dt)
                 std_growth_tmp = get_standard_angle(curr_x + dt) - get_standard_angle(curr_x)
                 treatment_effect_tmp = (rate_ideal * f_age_tmp * 1.0) * dt
-                curr_y = max(0.0, curr_y + std_growth_tmp + treatment_effect_tmp)
+                if curr_y > 28.0:
+                    curr_y = max(0.0, curr_y + std_growth_tmp + treatment_effect_tmp)
+                else:
+                    curr_y = max(0.0, curr_y + std_growth_tmp)
                 curr_x += dt
             return round(curr_y, 2)
 

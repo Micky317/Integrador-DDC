@@ -335,6 +335,8 @@ export default function EvolucionScreen() {
         text += ` Se requiere la carga de una nueva radiografía de control para estimar el plazo de corrección.`;
       }
 
+      text += ` Tras alcanzar el umbral de normalización (<28°), la proyección suspende la tasa de corrección activa del tratamiento y modela la estabilización fisiológica mediante el desarrollo óseo natural.`;
+
       if (age > 12) {
         text += `\n\n📌 Nota clínica: Dada la edad actual del lactante (${age.toFixed(1)} meses), la velocidad de remodelación acetabular es menor debido al grado de osificación, requiriendo un seguimiento continuo de la adherencia.`;
       }
@@ -362,6 +364,8 @@ export default function EvolucionScreen() {
       } else {
         text += ` Para darte un estimado de tiempo exacto, el sistema necesita recopilar los datos de tu próximo control radiográfico.`;
       }
+
+      text += ` Una vez que la cadera de tu bebé llegue a los ángulos correctos (<28°), la línea de proyección detiene la corrección activa y se estabiliza siguiendo la maduración ósea saludable, en lugar de seguir bajando infinitamente.`;
 
       if (age > 12) {
         text += `\n\n💡 Nota médica: Como tu bebé tiene ${age.toFixed(1)} meses de edad, la calcificación natural del hueso es mayor, por lo que la cadera corrige más lentamente. ¡Por eso la paciencia y la constancia diaria son tus mejores aliadas en esta etapa!`;
