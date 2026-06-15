@@ -64,7 +64,10 @@ export default function ReferenciaClinicaScreen() {
           value: currentAngle, 
           dataPointText: `${currentAngle}°`,
           dataPointColor: Colors.primary,
-          dataPointRadius: 6
+          dataPointRadius: 6,
+          textColor: '#FFFFFF',
+          textFontSize: 9,
+          textShiftY: -8
         };
       }
 
@@ -134,20 +137,32 @@ export default function ReferenciaClinicaScreen() {
             data={showBaseline ? regressionLineData : []}
             data2={prognosisData}
             height={220}
-            width={SCREEN_W - 80}
+            width={SCREEN_W - 90}
             initialSpacing={30}
-            spacing={40}
+            spacing={32}
             color1={Colors.statusNormal + '50'}
             color2={Colors.primary}
             thickness1={2}
             thickness2={4}
             dataPointsColor1={Colors.statusNormal + '50'}
             dataPointsColor2={Colors.primary}
-            yAxisTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
+            
+            // Clean axes and colors (resolves "negros" issue)
+            xAxisColor="rgba(255, 255, 255, 0.15)"
+            yAxisColor="rgba(255, 255, 255, 0.15)"
+            xAxisIndicesColor="rgba(255, 255, 255, 0.15)"
+            yAxisIndicesColor="rgba(255, 255, 255, 0.15)"
+            xAxisThickness={1}
+            yAxisThickness={1}
+            rulesColor="rgba(255, 255, 255, 0.08)"
+            
+            textColor1={Colors.textSecondary}
+            textColor2="#FFFFFF"
+            
+            yAxisTextStyle={{ color: Colors.textSecondary, fontSize: 10 }}
+            xAxisLabelTextStyle={{ color: Colors.textSecondary, fontSize: 10 }}
             noOfSections={4}
             yAxisLabelSuffix="°"
-            rulesColor="rgba(255,255,255,0.1)"
             curved
             areaChart={showBaseline}
             stepValue={5}

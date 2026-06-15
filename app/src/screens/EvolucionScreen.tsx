@@ -21,6 +21,7 @@ import { pacientesService } from '../services/pacientes.service';
 import { colorPorDiagnostico } from '../constants/clinical';
 import { rehabilitacionService, RegistroActividad } from '../services/rehabilitacion.service';
 import { parseDateSafe } from '../utils/helpers';
+import { useAppStore } from '../store/useAppStore';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -77,11 +78,18 @@ export default function EvolucionScreen() {
     router.back();
   };
 
+  const { user } = useAppStore();
+  const isMedico = user?.role === 'medico';
+
   const [activeTab, setActiveTab] = React.useState<'IA' | 'REHAB'>('IA');
   const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [viewingMonth, setViewingMonth] = React.useState(new Date());
   const [showPrediction, setShowPrediction] = React.useState(true);
   const [predGranularity, setPredGranularity] = React.useState<GranType>('meses');
+  const [selectedSide, setSelectedSide] = React.useState<'ambas' | 'izq' | 'der'>('ambas');
+  const [showIdealPlan, setShowIdealPlan] = React.useState(true);
+  const [showRefLines, setShowRefLines] = React.useState(false);
+  const [showValues, setShowValues] = React.useState(true);
 
   const { data: paciente, isLoading: loadingP } = useQuery({
     queryKey: ['paciente', pacienteId],
@@ -127,11 +135,27 @@ export default function EvolucionScreen() {
 
     const dataIzq = sorted.map(a => {
       const date = parseDateSafe(a.fechaRadiografia || a.creadoEn);
-      return { value: a.anguloIzq, label: date.toLocaleDateString('es-BO', { day: '2-digit', month: 'short' }), dataPointText: `${a.anguloIzq.toFixed(1)}°` };
+      return {
+        value: a.anguloIzq,
+        label: date.toLocaleDateString('es-BO', { day: '2-digit', month: 'short' }),
+        dataPointText: showValues ? `${a.anguloIzq.toFixed(1)}°` : undefined,
+        textColor: '#4D6EE3',
+        textFontSize: 9,
+        textShiftY: -16,
+        textShiftX: -4,
+      };
     });
     const dataDer = sorted.map(a => {
       const date = parseDateSafe(a.fechaRadiografia || a.creadoEn);
-      return { value: a.anguloDer, label: date.toLocaleDateString('es-BO', { day: '2-digit', month: 'short' }), dataPointText: `${a.anguloDer.toFixed(1)}°` };
+      return {
+        value: a.anguloDer,
+        label: date.toLocaleDateString('es-BO', { day: '2-digit', month: 'short' }),
+        dataPointText: showValues ? `${a.anguloDer.toFixed(1)}°` : undefined,
+        textColor: '#00E5CC',
+        textFontSize: 9,
+        textShiftY: -16,
+        textShiftX: 4,
+      };
     });
 
     const tend = sorted.length >= 2 ? {
@@ -156,18 +180,26 @@ export default function EvolucionScreen() {
     const predIzq = proyeccion.proyeccion_izq.map(p => ({
       value: p.angulo_proyectado,
       label: p.label,
-      dataPointText: `${p.angulo_proyectado.toFixed(1)}°`,
+      dataPointText: showValues ? `${p.angulo_proyectado.toFixed(1)}°` : undefined,
+      textColor: '#4D6EE3',
+      textFontSize: 9,
+      textShiftY: -16,
+      textShiftX: -4,
       customDataPoint: () => (
-        <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#4D6EE3', backgroundColor: 'rgba(9,13,31,0.9)' }} />
+        <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#4D6EE3', backgroundColor: Colors.bgCard }} />
       ),
     }));
 
     const predDer = proyeccion.proyeccion_der.map(p => ({
       value: p.angulo_proyectado,
       label: p.label,
-      dataPointText: `${p.angulo_proyectado.toFixed(1)}°`,
+      dataPointText: showValues ? `${p.angulo_proyectado.toFixed(1)}°` : undefined,
+      textColor: '#00E5CC',
+      textFontSize: 9,
+      textShiftY: -16,
+      textShiftX: 4,
       customDataPoint: () => (
-        <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#00E5CC', backgroundColor: 'rgba(9,13,31,0.9)' }} />
+        <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#00E5CC', backgroundColor: Colors.bgCard }} />
       ),
     }));
 
@@ -212,12 +244,20 @@ export default function EvolucionScreen() {
 
     const initialForecastDataIzq = proyeccion.pronostico_inicial_izq?.map(val => ({
       value: val,
-      hideDataPoints: true,
+      customDataPoint: () => (
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#4D6EE3', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' }} />
+        </View>
+      ),
     })) || [];
 
     const initialForecastDataDer = proyeccion.pronostico_inicial_der?.map(val => ({
       value: val,
-      hideDataPoints: true,
+      customDataPoint: () => (
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#00E5CC', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' }} />
+        </View>
+      ),
     })) || [];
 
     return {
@@ -231,13 +271,37 @@ export default function EvolucionScreen() {
       tendencia: tend,
       predictionInfo: predInfo,
     };
-  }, [historial, proyeccion]);
+  }, [historial, proyeccion, showValues]);
+
+  const chartData = useMemo(() => {
+    let mainData: any[] = [];
+    let secData: any[] = [];
+    let mainIdeal: any[] = [];
+    let secIdeal: any[] = [];
+
+    if (selectedSide === 'izq') {
+      mainData = showPrediction ? chartDataIzq : lineDataIzq;
+      mainIdeal = showIdealPlan ? initialForecastDataIzq : [];
+    } else if (selectedSide === 'der') {
+      mainData = showPrediction ? chartDataDer : lineDataDer;
+      mainIdeal = showIdealPlan ? initialForecastDataDer : [];
+    } else {
+      mainData = showPrediction ? chartDataIzq : lineDataIzq;
+      secData = showPrediction ? chartDataDer : lineDataDer;
+      mainIdeal = showIdealPlan ? initialForecastDataIzq : [];
+      secIdeal = showIdealPlan ? initialForecastDataDer : [];
+    }
+
+    return { mainData, secData, mainIdeal, secIdeal };
+  }, [selectedSide, showPrediction, showIdealPlan, chartDataIzq, lineDataIzq, chartDataDer, lineDataDer, initialForecastDataIzq, initialForecastDataDer]);
 
   const narrativaText = useMemo(() => {
     if (!proyeccion) return '';
     
     if (proyeccion.ya_esta_sano) {
-      return '🎉 ¡Felicidades! Ambos ángulos acetabulares están dentro del rango normal (<28°). ¡Todo el esfuerzo ha valido la pena! Continúa con los controles preventivos indicados por tu médico.';
+      return isMedico 
+        ? '📋 Evolución clínica: Ambas caderas se proyectan y se encuentran en rangos de normalidad (<28°).'
+        : '🎉 ¡Felicidades! Ambos ángulos acetabulares están dentro del rango normal (<28°). ¡Todo el esfuerzo ha valido la pena! Continúa con los controles preventivos indicados por tu médico.';
     }
 
     const trats = proyeccion.tratamientos_activos;
@@ -254,43 +318,65 @@ export default function EvolucionScreen() {
       return 'Observación';
     }).join(' + ') || 'Observación';
 
-    let text = '';
-    
-    // Frase motivacional inicial basada en el cumplimiento de ejercicios
-    if (compliance !== null && compliance !== undefined && trats.includes('ejercicios')) {
-      if (compliance >= 80) {
-        text += `✨ ¡Espectacular! Con una constancia del ${compliance}% en la rehabilitación, estás haciendo un trabajo extraordinario. `;
-      } else if (compliance >= 50) {
-        text += `👍 ¡Buen esfuerzo! Registras una constancia del ${compliance}% en los ejercicios diarios. `;
+    if (isMedico) {
+      // Narrativa profesional para médicos
+      let text = '📋 ';
+      if (compliance !== null && compliance !== undefined && trats.includes('ejercicios')) {
+        text += `El paciente registra una adherencia del ${compliance}% en el programa de rehabilitación prescrito. `;
       } else {
-        text += `💪 ¡Vamos, tú puedes! Actualmente registras una constancia del ${compliance}%. `;
+        text += `Bajo el protocolo terapéutico de ${treatmentsLabels}, `;
       }
+
+      text += `se proyecta una tasa de corrección acetabular promedio de ~${rate.toFixed(2)}° por mes.`;
+      
+      if (months) {
+        text += ` A este ritmo constante, se estima la normalización de los ángulos (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}.`;
+      } else {
+        text += ` Se requiere la carga de una nueva radiografía de control para estimar el plazo de corrección.`;
+      }
+
+      if (age > 12) {
+        text += `\n\n📌 Nota clínica: Dada la edad actual del lactante (${age.toFixed(1)} meses), la velocidad de remodelación acetabular es menor debido al grado de osificación, requiriendo un seguimiento continuo de la adherencia.`;
+      }
+      return text;
     } else {
-      text += `📋 Siguiendo el tratamiento activo de ${treatmentsLabels}, `;
-    }
+      // Narrativa amigable/motivacional para padres
+      let text = '';
+      
+      if (compliance !== null && compliance !== undefined && trats.includes('ejercicios')) {
+        if (compliance >= 80) {
+          text += `✨ ¡Espectacular! Con una constancia del ${compliance}% en la rehabilitación, estás haciendo un trabajo extraordinario. `;
+        } else if (compliance >= 50) {
+          text += `👍 ¡Buen esfuerzo! Registras una constancia del ${compliance}% en los ejercicios diarios. `;
+        } else {
+          text += `💪 ¡Vamos, tú puedes! Actualmente registras una constancia del ${compliance}%. `;
+        }
+      } else {
+        text += `📋 Siguiendo el tratamiento activo de ${treatmentsLabels}, `;
+      }
 
-    text += `se proyecta una tasa de corrección promedio de ~${rate.toFixed(2)}° por mes en las caderas.`;
-    
-    if (months) {
-      text += ` A este ritmo constante, tu bebé alcanzará el rango normal (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}. ¡Cada sesión de masajes y ejercicios cuenta!`;
-    } else {
-      text += ` Para darte un estimado de tiempo exacto, el sistema necesita recopilar los datos de tu próximo control radiográfico.`;
-    }
+      text += `se proyecta una tasa de corrección promedio de ~${rate.toFixed(2)}° por mes en las caderas.`;
+      
+      if (months) {
+        text += ` A este ritmo constante, tu bebé alcanzará el rango normal (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}. ¡Cada sesión de masajes y ejercicios cuenta!`;
+      } else {
+        text += ` Para darte un estimado de tiempo exacto, el sistema necesita recopilar los datos de tu próximo control radiográfico.`;
+      }
 
-    if (age > 12) {
-      text += `\n\n💡 Nota médica: Como tu bebé tiene ${age.toFixed(1)} meses de edad, la calcificación natural del hueso es mayor, por lo que la cadera corrige más lentamente. ¡Por eso la paciencia y la constancia diaria son tus mejores aliadas en esta etapa!`;
-    }
+      if (age > 12) {
+        text += `\n\n💡 Nota médica: Como tu bebé tiene ${age.toFixed(1)} meses de edad, la calcificación natural del hueso es mayor, por lo que la cadera corrige más lentamente. ¡Por eso la paciencia y la constancia diaria son tus mejores aliadas en esta etapa!`;
+      }
 
-    if (compliance !== null && compliance !== undefined && trats.includes('ejercicios') && compliance < 80) {
-      // Calculamos una tasa potencial si sube al 80% (aproximamos una mejora del 50% en la pendiente)
-      const potentialRate = rate * 1.5;
-      text += `\n\n🎯 Reto de recuperación: Si subes la constancia diaria del ${compliance}% al 80% o más, la tasa de mejora podría subir a ~${potentialRate.toFixed(2)}° al mes. ¡Esto podría recortar el tiempo de tratamiento en varios meses!`;
-    } else if (compliance !== null && compliance !== undefined && compliance >= 80) {
-      text += `\n\n🔥 ¡Mantén la racha! Tu disciplina de alta adherencia asegura que la proyección se cumpla en el menor tiempo estimado posible. ¡Sigue cuidando así la salud de tu bebé!`;
-    }
+      if (compliance !== null && compliance !== undefined && trats.includes('ejercicios') && compliance < 80) {
+        const potentialRate = rate * 1.5;
+        text += `\n\n🎯 Reto de recuperación: Si subes la constancia diaria del ${compliance}% al 80% o más, la tasa de mejora podría subir a ~${potentialRate.toFixed(2)}° al mes. ¡Esto podría recortar el tiempo de tratamiento en varios meses!`;
+      } else if (compliance !== null && compliance !== undefined && compliance >= 80) {
+        text += `\n\n🔥 ¡Mantén la racha! Tu disciplina de alta adherencia asegura que la proyección se cumpla en el menor tiempo estimado posible. ¡Sigue cuidando así la salud de tu bebé!`;
+      }
 
-    return text;
-  }, [proyeccion]);
+      return text;
+    }
+  }, [proyeccion, isMedico]);
 
   return (
     <LinearGradient colors={Colors.gradientBg} style={styles.gradient}>
@@ -339,88 +425,213 @@ export default function EvolucionScreen() {
             <>
               <View style={styles.chartTitleRow}>
                 <Text style={styles.sectionTitle}>Ángulo Acetabular (°)</Text>
-                {predictionInfo && (
-                  <TouchableOpacity
-                    style={[styles.predToggle, showPrediction && styles.predToggleActive]}
-                    onPress={() => setShowPrediction(p => !p)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={showPrediction ? 'eye' : 'eye-off'}
-                      size={13}
-                      color={showPrediction ? '#FFF' : Colors.textMuted}
-                    />
-                    <Text style={[styles.predToggleText, showPrediction && styles.predToggleTextActive]}>
-                      Proyección
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
-              {predictionInfo && showPrediction && (
-                <View style={styles.granRow}>
-                  {(['dias', 'semanas', 'meses'] as GranType[]).map(g => (
+              {/* Panel de Filtros Moderno */}
+              <GlassContainer intensity={10} style={styles.filterCard}>
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Cadera:</Text>
+                  <View style={styles.sideSelector}>
+                    {(['ambas', 'izq', 'der'] as const).map(side => (
+                      <TouchableOpacity
+                        key={side}
+                        style={[
+                          styles.sideBtn,
+                          selectedSide === side && styles.sideBtnActive
+                        ]}
+                        onPress={() => setSelectedSide(side)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[
+                          styles.sideBtnText,
+                          selectedSide === side && styles.sideBtnTextActive
+                        ]}>
+                          {side === 'ambas' ? 'Ambas' : side === 'izq' ? 'Izq' : 'Der'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.toggleRow}>
+                  {predictionInfo && (
                     <TouchableOpacity
-                      key={g}
-                      style={[styles.granPill, predGranularity === g && styles.granPillActive]}
-                      onPress={() => setPredGranularity(g)}
-                      activeOpacity={0.8}
+                      style={[styles.toggleChip, showPrediction && styles.toggleChipActive]}
+                      onPress={() => setShowPrediction(p => !p)}
+                      activeOpacity={0.7}
                     >
-                      <Text style={[styles.granText, predGranularity === g && styles.granTextActive]}>
-                        {g === 'dias' ? 'Días' : g === 'semanas' ? 'Semanas' : 'Meses'}
+                      <Ionicons
+                        name={showPrediction ? 'eye' : 'eye-off'}
+                        size={12}
+                        color={showPrediction ? Colors.primary : Colors.textMuted}
+                      />
+                      <Text style={[styles.toggleChipText, showPrediction && styles.toggleChipTextActive]}>
+                        Proyección IA
                       </Text>
                     </TouchableOpacity>
-                  ))}
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.toggleChip, showIdealPlan && styles.toggleChipActive]}
+                    onPress={() => setShowIdealPlan(p => !p)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={showIdealPlan ? 'eye' : 'eye-off'}
+                      size={12}
+                      color={showIdealPlan ? Colors.primary : Colors.textMuted}
+                    />
+                    <Text style={[styles.toggleChipText, showIdealPlan && styles.toggleChipTextActive]}>
+                      Plan Ideal
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.toggleChip, showRefLines && styles.toggleChipActive]}
+                    onPress={() => setShowRefLines(p => !p)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={showRefLines ? 'eye' : 'eye-off'}
+                      size={12}
+                      color={showRefLines ? Colors.primary : Colors.textMuted}
+                    />
+                    <Text style={[styles.toggleChipText, showRefLines && styles.toggleChipTextActive]}>
+                      Líneas Guía
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.toggleChip, showValues && styles.toggleChipActive]}
+                    onPress={() => setShowValues(p => !p)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={showValues ? 'eye' : 'eye-off'}
+                      size={12}
+                      color={showValues ? Colors.primary : Colors.textMuted}
+                    />
+                    <Text style={[styles.toggleChipText, showValues && styles.toggleChipTextActive]}>
+                      Valores
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              )}
+
+                {predictionInfo && showPrediction && (
+                  <View style={styles.granRow}>
+                    <Text style={styles.filterLabel}>Intervalo:</Text>
+                    <View style={styles.granSelector}>
+                      {(['dias', 'semanas', 'meses'] as GranType[]).map(g => (
+                        <TouchableOpacity
+                          key={g}
+                          style={[styles.granPill, predGranularity === g && styles.granPillActive]}
+                          onPress={() => setPredGranularity(g)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.granText, predGranularity === g && styles.granTextActive]}>
+                            {g === 'dias' ? 'Días' : g === 'semanas' ? 'Semanas' : 'Meses'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </GlassContainer>
+
               <GlassContainer intensity={20} style={styles.chartCard}>
                 <View style={styles.legend}>
-                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#4D6EE3' }]} /><Text style={styles.legendText}>Izq</Text></View>
-                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#00E5CC' }]} /><Text style={styles.legendText}>Der</Text></View>
+                  {(selectedSide === 'ambas' || selectedSide === 'izq') && (
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#4D6EE3' }]} />
+                      <Text style={styles.legendText}>Izq</Text>
+                    </View>
+                  )}
+                  {(selectedSide === 'ambas' || selectedSide === 'der') && (
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: '#00E5CC' }]} />
+                      <Text style={styles.legendText}>Der</Text>
+                    </View>
+                  )}
                   {predictionInfo && showPrediction && (
-                    <>
-                      <View style={styles.legendItem}>
-                        <View style={styles.legendDotHollow} />
-                        <Text style={styles.legendText}>Proy. Actual</Text>
-                      </View>
-                      <View style={styles.legendItem}>
-                        <View style={[styles.legendDotHollow, { borderColor: '#888888', borderStyle: 'dashed' }]} />
-                        <Text style={styles.legendText}>Plan Ideal</Text>
-                      </View>
-                    </>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDotHollow, { borderColor: selectedSide === 'der' ? '#00E5CC' : '#4D6EE3' }]} />
+                      <Text style={styles.legendText}>Proy. IA</Text>
+                    </View>
+                  )}
+                  {showIdealPlan && (
+                    <View style={styles.legendItem}>
+                      <View style={[styles.legendDotHollow, { borderColor: Colors.statusNormal, borderStyle: 'dashed' }]} />
+                      <Text style={styles.legendText}>Plan Ideal</Text>
+                    </View>
                   )}
                 </View>
                 <LineChart
-                  data={showPrediction ? chartDataIzq : lineDataIzq}
-                  data2={showPrediction ? chartDataDer : lineDataDer}
-                  data3={showPrediction ? initialForecastDataIzq : []}
-                  data4={showPrediction ? initialForecastDataDer : []}
+                  data={chartData.mainData}
+                  data2={chartData.secData.length > 0 ? chartData.secData : undefined}
+                  data3={chartData.mainIdeal.length > 0 ? chartData.mainIdeal : undefined}
+                  data4={chartData.secIdeal.length > 0 ? chartData.secIdeal : undefined}
                   height={200}
-                  width={SCREEN_W - 100}
-                  initialSpacing={20}
-                  spacing={Math.max(35, Math.floor((SCREEN_W - 140) / Math.max((showPrediction ? chartDataIzq : lineDataIzq).length - 1, 1)))}
-                  color1="#4D6EE3"
-                  color2="#00E5CC"
-                  color3="rgba(77, 110, 227, 0.22)"
-                  color4="rgba(0, 229, 204, 0.22)"
+                  width={SCREEN_W - 90}
+                  initialSpacing={25}
+                  spacing={Math.max(40, Math.floor((SCREEN_W - 130) / Math.max((chartData.mainData || []).length - 1, 1)))}
+                  color1={selectedSide === 'der' ? '#00E5CC' : '#4D6EE3'}
+                  color2={selectedSide === 'der' ? 'transparent' : '#00E5CC'}
+                  color3="rgba(0, 196, 140, 0.4)" // Verde clínico suave (salud/recuperación)
+                  color4={selectedSide === 'ambas' ? 'rgba(0, 196, 140, 0.4)' : 'transparent'}
                   thickness={3}
                   thickness3={1.5}
                   thickness4={1.5}
                   strokeDashArray3={[4, 4]}
                   strokeDashArray4={[4, 4]}
-                  dataPointsColor1="#4D6EE3"
-                  dataPointsColor2="#00E5CC"
+                  dataPointsColor1={selectedSide === 'der' ? '#00E5CC' : '#4D6EE3'}
+                  dataPointsColor2={selectedSide === 'der' ? 'transparent' : '#00E5CC'}
+                  dataPointsColor3="rgba(0, 196, 140, 0.4)"
+                  dataPointsColor4={selectedSide === 'ambas' ? 'rgba(0, 196, 140, 0.4)' : 'transparent'}
+                  dataPointsWidth={10}
+                  dataPointsHeight={10}
                   dataPointsRadius={5}
-                  yAxisTextStyle={{ color: Colors.textMuted, fontSize: 10 }}
-                  xAxisLabelTextStyle={{ color: Colors.textMuted, fontSize: 9 }}
+                  textColor1={selectedSide === 'der' ? '#00E5CC' : '#4D6EE3'}
+                  textColor2={selectedSide === 'der' ? 'transparent' : '#00E5CC'}
+                  textColor3={selectedSide === 'der' ? '#00E5CC' : '#4D6EE3'}
+                  textColor4={selectedSide === 'der' ? 'transparent' : '#00E5CC'}
+                  textFontSize1={9}
+                  textFontSize2={9}
+                  xAxisColor="rgba(255, 255, 255, 0.15)"
+                  yAxisColor="rgba(255, 255, 255, 0.15)"
+                  xAxisIndicesColor="rgba(255, 255, 255, 0.15)"
+                  yAxisIndicesColor="rgba(255, 255, 255, 0.15)"
+                  xAxisThickness={1}
+                  yAxisThickness={1}
+                  rulesColor="rgba(255, 255, 255, 0.08)"
+                  showReferenceLine1={showRefLines}
+                  referenceLine1Position={28}
+                  referenceLine1Config={{
+                    color: 'rgba(77, 110, 227, 0.35)', // Azul índigo muy sutil del tema
+                    thickness: 1.2,
+                    type: 'dashed',
+                    dashWidth: 5,
+                    dashGap: 5,
+                  }}
+                  showReferenceLine2={showRefLines}
+                  referenceLine2Position={30}
+                  referenceLine2Config={{
+                    color: 'rgba(255, 71, 87, 0.35)', // Rojo semáforo muy sutil/transparente
+                    thickness: 1.2,
+                    type: 'dashed',
+                    dashWidth: 5,
+                    dashGap: 5,
+                  }}
+                  yAxisTextStyle={{ color: Colors.textSecondary, fontSize: 10 }}
+                  xAxisLabelTextStyle={{ color: Colors.textSecondary, fontSize: 9 }}
                   noOfSections={4}
                   yAxisLabelSuffix="°"
-                  rulesColor="rgba(255,255,255,0.1)"
                 />
-                <View style={styles.refLegend}>
-                  <View style={styles.refLegendItem}><View style={[styles.refLineSwatch, { backgroundColor: Colors.statusWarning }]} /><Text style={styles.refLegendText}>28° Límite</Text></View>
-                  <View style={styles.refLegendItem}><View style={[styles.refLineSwatch, { backgroundColor: Colors.statusDanger }]} /><Text style={styles.refLegendText}>30° Displasia</Text></View>
-                </View>
+                {showRefLines && (
+                  <View style={styles.refLegend}>
+                    <View style={styles.refLegendItem}><View style={[styles.refLineSwatch, { backgroundColor: 'rgba(77, 110, 227, 0.6)' }]} /><Text style={styles.refLegendText}>28° Límite</Text></View>
+                    <View style={styles.refLegendItem}><View style={[styles.refLineSwatch, { backgroundColor: 'rgba(255, 71, 87, 0.6)' }]} /><Text style={styles.refLegendText}>30° Displasia</Text></View>
+                  </View>
+                )}
               </GlassContainer>
 
               {predictionInfo && showPrediction && (
@@ -600,7 +811,21 @@ const styles = StyleSheet.create({
   refLineSwatch: { width: 16, height: 2, borderRadius: 1 },
   refLegendText: { color: Colors.textMuted, fontSize: Typography.size.xs, fontFamily: Typography.fonts.regular },
   chartTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 4 },
-  granRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+  filterCard: { padding: Spacing.md, gap: Spacing.sm, marginBottom: Spacing.sm, borderRadius: Radius.md },
+  filterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  filterLabel: { color: Colors.textSecondary, fontSize: 11, fontFamily: Typography.fonts.bold, textTransform: 'uppercase', letterSpacing: 0.5, minWidth: 60 },
+  sideSelector: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: 3 },
+  sideBtn: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 8 },
+  sideBtnActive: { backgroundColor: Colors.bgCardLight, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  sideBtnText: { color: Colors.textMuted, fontSize: 12, fontFamily: Typography.fonts.medium },
+  sideBtnTextActive: { color: '#FFF', fontFamily: Typography.fonts.semibold },
+  toggleRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: Spacing.xs },
+  toggleChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)' },
+  toggleChipActive: { borderColor: Colors.primary + '40', backgroundColor: Colors.primary + '10' },
+  toggleChipText: { color: Colors.textMuted, fontSize: 11, fontFamily: Typography.fonts.medium },
+  toggleChipTextActive: { color: Colors.primary, fontFamily: Typography.fonts.semibold },
+  granRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
+  granSelector: { flex: 1, flexDirection: 'row', gap: 6 },
   granPill: { flex: 1, alignItems: 'center', paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.04)' },
   granPillActive: { backgroundColor: 'rgba(0,229,204,0.15)', borderColor: Colors.primary },
   granText: { color: Colors.textMuted, fontSize: 12, fontFamily: Typography.fonts.medium },

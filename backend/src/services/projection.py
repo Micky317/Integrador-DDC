@@ -51,11 +51,21 @@ def get_age_calcification_factor(age_months: float) -> float:
     else:
         return 0.2     # 20% efectividad (baja plasticidad)
 
+_POPULATION_RATES_CACHE = None
+_POPULATION_RATES_CACHE_TIME = 0.0
+
 def get_population_treatment_rates() -> dict:
     """
     Analiza a todos los pacientes y su historial de radiografías en la BD
     para calcular las tasas de corrección reales promedio por combinación de tratamientos.
     """
+    global _POPULATION_RATES_CACHE, _POPULATION_RATES_CACHE_TIME
+    import time
+    
+    # Caché por 5 minutos (300 segundos) para evitar peticiones repetitivas a Supabase
+    if _POPULATION_RATES_CACHE is not None and (time.time() - _POPULATION_RATES_CACHE_TIME) < 300:
+        return _POPULATION_RATES_CACHE
+
     if not supabase_client:
         return {}
         
@@ -129,6 +139,8 @@ def get_population_treatment_rates() -> dict:
         for trats_key, slopes in treatment_slopes.items():
             rates[trats_key] = (sum(slopes) / len(slopes), len(slopes))
             
+        _POPULATION_RATES_CACHE = rates
+        _POPULATION_RATES_CACHE_TIME = time.time()
         return rates
     except Exception as e:
         print(f"❌ Error al calcular tasas poblacionales: {e}")
@@ -198,17 +210,22 @@ def calculate_patient_compliance(paciente_id: str) -> float:
         print(f"❌ Error al calcular adherencia del paciente {paciente_id}: {e}")
         return 0.8
 
-def calculate_patient_response_factor(paciente_id: str, birth_date_str: str, base_treatment_rate: float) -> float:
+def calculate_patient_response_factor(paciente_id: str, birth_date_str: str, base_treatment_rate: float, analyses: list = None) -> float:
     """
     Compara la evolución clínica histórica del paciente con la tasa promedio esperada.
     Genera un factor gamma de respuesta biológica individual (feedback loop).
     """
-    if not supabase_client or not birth_date_str or abs(base_treatment_rate) < 0.05:
+    if not birth_date_str or abs(base_treatment_rate) < 0.05:
         return 1.0
         
     try:
-        res = supabase_client.table("analisis").select("fecha_radiografia, created_at, angulo_izq, angulo_der").eq("paciente_id", paciente_id).execute()
-        analyses = [a for a in res.data if a.get("angulo_izq") is not None and a.get("angulo_der") is not None]
+        if analyses is None:
+            if not supabase_client:
+                return 1.0
+            res = supabase_client.table("analisis").select("fecha_radiografia, created_at, angulo_izq, angulo_der").eq("paciente_id", paciente_id).execute()
+            analyses = [a for a in res.data if a.get("angulo_izq") is not None and a.get("angulo_der") is not None]
+        else:
+            analyses = [a for a in analyses if a.get("angulo_izq") is not None and a.get("angulo_der") is not None]
         
         if len(analyses) < 2:
             return 1.0
@@ -304,7 +321,7 @@ def generate_patient_projection(paciente_id: str, granularity: str = "meses") ->
         effective_rate = base_rate - exercises_portion + (exercises_portion * compliance)
         
         # 5. Obtener el factor de respuesta individual (feedback loop)
-        gamma = calculate_patient_response_factor(paciente_id, birth_date, effective_rate)
+        gamma = calculate_patient_response_factor(paciente_id, birth_date, effective_rate, analyses=analyses)
         
         # 6. Definir pasos y escalas según granularidad
         if granularity == "dias":
