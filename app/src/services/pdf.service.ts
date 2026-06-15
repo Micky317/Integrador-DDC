@@ -224,7 +224,11 @@ export const pdfService = {
             if (proyeccion.ya_esta_sano) {
               estimateText = 'Ambas caderas se encuentran actualmente dentro del rango normal (&lt;28°).';
             } else if (proyeccion.meses_para_meta) {
-              estimateText = `Se proyecta que las caderas alcanzarán el rango normal (&lt;28°) en aproximadamente <strong>${proyeccion.meses_para_meta} meses</strong> continuando con el tratamiento activo y la constancia de ejercicios recomendada.`;
+              const meses = proyeccion.meses_para_meta;
+              const dias = Math.round(meses * 30.44);
+              const diasTexto = `${dias} días`;
+              const mesesTexto = meses === 1 ? '1 mes' : `${meses} meses`;
+              estimateText = `Se proyecta que las caderas alcanzarán el rango normal (&lt;28°) en aproximadamente <strong>${mesesTexto} (equivalente a ~${diasTexto})</strong> continuando con el tratamiento activo y la constancia de ejercicios recomendada.`;
             } else {
               estimateText = 'Se requiere del seguimiento y carga de nuevos estudios radiográficos de control para proyectar un tiempo estimado de recuperación.';
             }

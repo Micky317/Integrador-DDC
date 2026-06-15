@@ -330,7 +330,8 @@ export default function EvolucionScreen() {
       text += `se proyecta una tasa de corrección acetabular promedio de ~${rate.toFixed(2)}° por mes.`;
       
       if (months) {
-        text += ` A este ritmo constante, se estima la normalización de los ángulos (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}.`;
+        const days = Math.round(months * 30.44);
+        text += ` A este ritmo constante, se estima la normalización de los ángulos (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'} (~${days} días).`;
       } else {
         text += ` Se requiere la carga de una nueva radiografía de control para estimar el plazo de corrección.`;
       }
@@ -360,7 +361,8 @@ export default function EvolucionScreen() {
       text += `se proyecta una tasa de corrección promedio de ~${rate.toFixed(2)}° por mes en las caderas.`;
       
       if (months) {
-        text += ` A este ritmo constante, tu bebé alcanzará el rango normal (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'}. ¡Cada sesión de masajes y ejercicios cuenta!`;
+        const days = Math.round(months * 30.44);
+        text += ` A este ritmo constante, tu bebé alcanzará el rango normal (<28°) en aproximadamente ${months} ${months === 1 ? 'mes' : 'meses'} (~${days} días). ¡Cada sesión de masajes y ejercicios cuenta!`;
       } else {
         text += ` Para darte un estimado de tiempo exacto, el sistema necesita recopilar los datos de tu próximo control radiográfico.`;
       }
