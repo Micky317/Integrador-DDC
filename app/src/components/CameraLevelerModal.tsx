@@ -375,13 +375,14 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
             {/* Header y Texto de Instrucción Integrado */}
             <View style={styles.headerContainer}>
               <View style={styles.header}>
+                {/* Botón de Cierre a la izquierda */}
                 <Animated.View style={animatedStyle}>
                   <TouchableOpacity onPress={onCancel} style={styles.closeBtn} activeOpacity={0.7}>
                     <Ionicons name="close" size={26} color="#FFF" />
                   </TouchableOpacity>
                 </Animated.View>
 
-                {/* Badge del Estado de Calibración / Ángulo */}
+                {/* Badge Único del Estado de Calibración / Instrucción Simplificada */}
                 <Animated.View style={animatedStyle}>
                   <GlassContainer style={styles.statusBadge}>
                     <View style={styles.badgeContent}>
@@ -393,29 +394,26 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
                             : styles.dotYellow,
                         ]}
                       />
-                      <Text style={styles.badgeText}>
-                        {isCalibrated
-                          ? `Calibrado: ${angleDeg.toFixed(1)}°`
-                          : `${isAutoHorizontal ? 'Auto Mesa' : 'Auto Pared'}: ${angleDeg.toFixed(1)}°`}
-                        {!isFlat && Math.abs(rollAngle) >= 1.5 && ` | Giro: ${rollAngle > 0 ? '+' : ''}${rollAngle.toFixed(1)}°`}
+                      <Text style={[styles.badgeText, isAlignedBoth && styles.badgeTextAligned]}>
+                        {isAlignedBoth
+                          ? `Listo (${angleDeg.toFixed(1)}°)`
+                          : !currentlyAligned
+                          ? `Incline (${angleDeg.toFixed(1)}°)`
+                          : `Gire (${Math.abs(rollAngle).toFixed(1)}°)`}
                       </Text>
                     </View>
                   </GlassContainer>
                 </Animated.View>
 
-                <View style={{ width: 44 }} />
+                {/* Badge de Modo Activo a la derecha para equilibrar visualmente */}
+                <Animated.View style={animatedStyle}>
+                  <GlassContainer style={styles.modeBadge}>
+                    <Text style={styles.modeBadgeText}>
+                      {isCalibrated ? 'MANUAL' : (isAutoHorizontal ? 'MESA' : 'PARED')}
+                    </Text>
+                  </GlassContainer>
+                </Animated.View>
               </View>
-
-              {/* Instrucción limpia y compacta en la parte superior (debajo del header) */}
-              <Animated.View style={[animatedStyle, styles.instructionWrapper]}>
-                <Text style={[styles.instructionText, isAlignedBoth && styles.instructionTextAligned]}>
-                  {isAlignedBoth
-                    ? '✓ Celular alineado. ¡Tome la foto!'
-                    : !currentlyAligned
-                    ? 'Incline el celular para centrar la burbuja'
-                    : 'Gire el celular lateralmente para nivelar el horizonte'}
-                </Text>
-              </Animated.View>
             </View>
 
             {/* Panel de Controles Inferiores */}
@@ -666,16 +664,32 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statusBadge: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.round,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
+  modeBadge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    width: 75,
+    alignItems: 'center',
+  },
+  modeBadgeText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 10,
+    fontFamily: Typography.fonts.bold,
+    letterSpacing: 0.5,
+  },
   badgeContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   statusDot: {
     width: 8,
@@ -699,19 +713,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     fontFamily: Typography.fonts.semibold,
   },
-  instructionWrapper: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  instructionText: {
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontSize: Typography.size.base - 1,
-    fontFamily: Typography.fonts.semibold,
-    textAlign: 'center',
-    paddingHorizontal: Spacing.md,
-  },
-  instructionTextAligned: {
+  badgeTextAligned: {
     color: Colors.primary,
     fontFamily: Typography.fonts.bold,
   },
