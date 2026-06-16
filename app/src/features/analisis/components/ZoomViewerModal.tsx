@@ -133,7 +133,6 @@ export const ZoomViewerModal: React.FC<ZoomViewerModalProps> = ({
           ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={{ 
-            paddingTop: paddingTop,
             alignItems: 'center'
           }}
           maximumZoomScale={maxZoom}
@@ -141,12 +140,14 @@ export const ZoomViewerModal: React.FC<ZoomViewerModalProps> = ({
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
         >
-          <Image
-            key={imageUri}
-            source={{ uri: imageUri }}
-            style={{ width: SCREEN_WIDTH, height: containerHeight }}
-            resizeMode="contain"
-          />
+          <View style={{ width: SCREEN_WIDTH, height: Math.max(displayHeight, containerHeight), position: 'relative' }}>
+            <Image
+              key={imageUri}
+              source={{ uri: imageUri }}
+              style={{ width: SCREEN_WIDTH, height: containerHeight, position: 'absolute', top: paddingTop, left: 0 }}
+              resizeMode="contain"
+            />
+          </View>
         </ScrollView>
       </View>
     </Modal>

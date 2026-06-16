@@ -259,7 +259,6 @@ export const EditorPuntosModal = ({ visible, onClose, imageUri, originalSize, pu
           ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={{ 
-            paddingTop: paddingTop,
             alignItems: 'center' 
           }}
           maximumZoomScale={maxZoom}
@@ -272,8 +271,9 @@ export const EditorPuntosModal = ({ visible, onClose, imageUri, originalSize, pu
             if (scale) setZoomScale(scale);
           }}
         >
+          <View style={{ width: SCREEN_WIDTH, height: Math.max(displayHeight, containerHeight), position: 'relative' }}>
             <View
-              style={{ width: SCREEN_WIDTH, height: containerHeight, position: 'relative' }}
+              style={{ width: SCREEN_WIDTH, height: containerHeight, position: 'absolute', top: paddingTop, left: 0 }}
               onLayout={(e) => setContainerSize({w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height})}
             >
               {imageUri ? (
@@ -298,6 +298,7 @@ export const EditorPuntosModal = ({ visible, onClose, imageUri, originalSize, pu
                   />
               ))}
             </View>
+          </View>
         </ScrollView>
       </View>
     </Modal>
