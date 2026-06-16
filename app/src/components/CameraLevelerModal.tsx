@@ -84,13 +84,11 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
           z: smoothZ.current,
         });
 
-        // 2. Detección de orientación con histéresis adaptable (también para modo Mesa)
+        // 2. Detección de orientación con histéresis adaptable (para modo Mesa)
         const ax = data.x;
         const ay = data.y;
         const az = data.z;
 
-        // Si el teléfono está apuntando hacia abajo (mesa), los valores de x e y son muy pequeños.
-        // Reducimos el umbral a 0.08 para detectar giros horizontales sobre la mesa.
         const isFlatDetect = Math.abs(az) > 0.75;
         const threshold = isFlatDetect ? 0.08 : 0.55;
 
@@ -130,11 +128,9 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
 
   // Función para obtener vector de gravedad ideal por defecto (Auto-calibración)
   const getDefaultReference = (x: number, y: number, z: number, orientation: 'PORTRAIT' | 'LANDSCAPE_LEFT' | 'LANDSCAPE_RIGHT') => {
-    // Si el teléfono está plano en mesa (predomina z)
     if (Math.abs(z) > 0.75) {
       return { x: 0, y: 0, z: z > 0 ? 1 : -1 };
     }
-    // Si está vertical (negatoscopio en pared)
     if (orientation === 'PORTRAIT') {
       return { x: 0, y: y > 0 ? 1 : -1, z: 0 };
     } else if (orientation === 'LANDSCAPE_LEFT') {
@@ -292,16 +288,6 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     }
   };
 
-  // Definir dimensiones dinámicas del marco de encuadre
-  const isLandscape = deviceOrientation !== 'PORTRAIT';
-  const maxFrameHeight = SCREEN_HEIGHT - 280;
-  const frameWidth = isLandscape
-    ? SCREEN_WIDTH - Spacing.lg * 2
-    : Math.min(SCREEN_WIDTH - Spacing.lg * 2, (maxFrameHeight * 3) / 4);
-  const frameHeight = isLandscape
-    ? (frameWidth * 3) / 4
-    : (frameWidth * 4) / 3;
-
   // Animación de rotación de la UI
   const rotation = rotateAnim.interpolate({
     inputRange: [-1, 0, 1],
@@ -350,113 +336,90 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     <Modal visible={visible} animationType="slide" statusBarTranslucent>
       <View style={styles.container}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="back" mode="picture">
-          {/* Capas oscuras de máscara de recorte */}
-          <View style={styles.maskContainer}>
-            {/* Superior */}
-            <View style={styles.maskDark} />
-
-            <View style={[styles.maskRow, { height: frameHeight }]}>
-              {/* Izquierda */}
-              <View style={styles.maskDark} />
-
-              {/* Recuadro de encuadre */}
-              <View style={[styles.frameOutline, { width: frameWidth, height: frameHeight }]}>
-                {/* Esquinas cosméticas */}
-                <View style={[styles.corner, styles.cornerTL]} />
-                <View style={[styles.corner, styles.cornerTR]} />
-                <View style={[styles.corner, styles.cornerBL]} />
-                <View style={[styles.corner, styles.cornerBR]} />
-
-                {/* Indicador de horizonte lateral (DSLR style) */}
-                {!isFlat && (
-                  <View
-                    style={[
-                      styles.horizonContainer,
-                      {
-                        width: frameWidth,
-                        transform: [{ rotate: `${-rollAngle}deg` }],
-                      },
-                    ]}
-                  >
-                    <View style={[styles.horizonLine, currentlyLeveled && styles.horizonLineLeveled]} />
-                    <View style={{ width: LEVEL_RADIUS * 2 + 20 }} />
-                    <View style={[styles.horizonLine, currentlyLeveled && styles.horizonLineLeveled]} />
-                  </View>
-                )}
-
-                {/* Burbuja niveladora física en el centro */}
-                <View style={styles.levelerContainer}>
-                  <View style={[styles.levelOuter, isAlignedBoth && styles.levelOuterAligned]}>
-                    <View style={styles.levelCrosshairH} />
-                    <View style={styles.levelCrosshairV} />
-                    <View style={[styles.levelInner, isAlignedBoth && styles.levelInnerAligned]} />
-                    <View
-                      style={[
-                        styles.bubble,
-                        isAlignedBoth ? styles.bubbleAligned : styles.bubbleMisaligned,
-                        { transform: [{ translateX: bubbleX }, { translateY: bubbleY }] },
-                      ]}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              {/* Derecha */}
-              <View style={styles.maskDark} />
+          
+          {/* Indicador de horizonte lateral (DSLR style) para evitar fotos torcidas */}
+          {!isFlat && (
+            <View
+              style={[
+                styles.horizonContainer,
+                {
+                  transform: [{ rotate: `${-rollAngle}deg` }],
+                },
+              ]}
+            >
+              <View style={[styles.horizonLine, currentlyLeveled && styles.horizonLineLeveled]} />
+              <View style={{ width: LEVEL_RADIUS * 2 + 20 }} />
+              <View style={[styles.horizonLine, currentlyLeveled && styles.horizonLineLeveled]} />
             </View>
+          )}
 
-            {/* Inferior */}
-            <View style={[styles.maskDark, { flex: 1.4 }]} />
+          {/* Burbuja niveladora física en el centro */}
+          <View style={styles.levelerContainer}>
+            <View style={[styles.levelOuter, isAlignedBoth && styles.levelOuterAligned]}>
+              <View style={styles.levelCrosshairH} />
+              <View style={styles.levelCrosshairV} />
+              <View style={[styles.levelInner, isAlignedBoth && styles.levelInnerAligned]} />
+              <View
+                style={[
+                  styles.bubble,
+                  isAlignedBoth ? styles.bubbleAligned : styles.bubbleMisaligned,
+                  { transform: [{ translateX: bubbleX }, { translateY: bubbleY }] },
+                ]}
+              />
+            </View>
           </View>
 
           {/* Interfaz de Usuario Overlay */}
           <View style={styles.hudOverlay}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Animated.View style={animatedStyle}>
-                <TouchableOpacity onPress={onCancel} style={styles.closeBtn} activeOpacity={0.7}>
-                  <Ionicons name="close" size={26} color="#FFF" />
-                </TouchableOpacity>
-              </Animated.View>
+            
+            {/* Header y Texto de Instrucción Integrado */}
+            <View style={styles.headerContainer}>
+              <View style={styles.header}>
+                <Animated.View style={animatedStyle}>
+                  <TouchableOpacity onPress={onCancel} style={styles.closeBtn} activeOpacity={0.7}>
+                    <Ionicons name="close" size={26} color="#FFF" />
+                  </TouchableOpacity>
+                </Animated.View>
 
-              {/* Badge del Estado de Calibración / Ángulo */}
-              <Animated.View style={animatedStyle}>
-                <GlassContainer style={styles.statusBadge}>
-                  <View style={styles.badgeContent}>
-                    <View
-                      style={[
-                        styles.statusDot,
-                        isAlignedBoth
-                          ? isCalibrated ? styles.dotGreen : styles.dotCyan
-                          : styles.dotYellow,
-                      ]}
-                    />
-                    <Text style={styles.badgeText}>
-                      {isCalibrated
-                        ? `Calibrado: ${angleDeg.toFixed(1)}°`
-                        : `${isAutoHorizontal ? 'Auto Mesa' : 'Auto Pared'}: ${angleDeg.toFixed(1)}°`}
-                      {!isFlat && Math.abs(rollAngle) >= 1.5 && ` | Giro: ${rollAngle > 0 ? '+' : ''}${rollAngle.toFixed(1)}°`}
-                    </Text>
-                  </View>
-                </GlassContainer>
-              </Animated.View>
+                {/* Badge del Estado de Calibración / Ángulo */}
+                <Animated.View style={animatedStyle}>
+                  <GlassContainer style={styles.statusBadge}>
+                    <View style={styles.badgeContent}>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          isAlignedBoth
+                            ? isCalibrated ? styles.dotGreen : styles.dotCyan
+                            : styles.dotYellow,
+                        ]}
+                      />
+                      <Text style={styles.badgeText}>
+                        {isCalibrated
+                          ? `Calibrado: ${angleDeg.toFixed(1)}°`
+                          : `${isAutoHorizontal ? 'Auto Mesa' : 'Auto Pared'}: ${angleDeg.toFixed(1)}°`}
+                        {!isFlat && Math.abs(rollAngle) >= 1.5 && ` | Giro: ${rollAngle > 0 ? '+' : ''}${rollAngle.toFixed(1)}°`}
+                      </Text>
+                    </View>
+                  </GlassContainer>
+                </Animated.View>
 
-              <View style={{ width: 44 }} />
-            </View>
+                <View style={{ width: 44 }} />
+              </View>
 
-            {/* Panel de Controles Inferiores y Texto de Instrucción Integrado */}
-            <View style={styles.bottomContainer}>
-              {/* Instrucción limpia y compacta (fuera de la pantalla de la radiografía) */}
+              {/* Instrucción limpia y compacta en la parte superior (debajo del header) */}
               <Animated.View style={[animatedStyle, styles.instructionWrapper]}>
-                <Text style={styles.instructionText}>
+                <Text style={[styles.instructionText, isAlignedBoth && styles.instructionTextAligned]}>
                   {isAlignedBoth
-                    ? '✓ Teléfono alineado. ¡Tome la foto!'
+                    ? '✓ Celular alineado. ¡Tome la foto!'
                     : !currentlyAligned
                     ? 'Incline el celular para centrar la burbuja'
                     : 'Gire el celular lateralmente para nivelar el horizonte'}
                 </Text>
               </Animated.View>
+            </View>
 
+            {/* Panel de Controles Inferiores */}
+            <View style={styles.bottomContainer}>
               <View style={styles.bottomControls}>
                 {/* Botón de Calibración */}
                 <Animated.View style={animatedStyle}>
@@ -570,64 +533,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.base,
     fontFamily: Typography.fonts.bold,
   },
-  maskContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  maskDark: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
-  maskRow: {
-    flexDirection: 'row',
-    width: '100%',
-  },
-  frameOutline: {
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  corner: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderColor: '#FFF',
-  },
-  cornerTL: {
-    top: -1,
-    left: -1,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-  },
-  cornerTR: {
-    top: -1,
-    right: -1,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-  },
-  cornerBL: {
-    bottom: -1,
-    left: -1,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-  },
-  cornerBR: {
-    bottom: -1,
-    right: -1,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-  },
   horizonContainer: {
     position: 'absolute',
+    top: SCREEN_HEIGHT / 2 - 1,
+    left: 0,
+    width: SCREEN_WIDTH,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -654,6 +564,10 @@ const styles = StyleSheet.create({
   },
   levelerContainer: {
     position: 'absolute',
+    top: SCREEN_HEIGHT / 2 - LEVEL_RADIUS,
+    left: SCREEN_WIDTH / 2 - LEVEL_RADIUS,
+    width: LEVEL_RADIUS * 2,
+    height: LEVEL_RADIUS * 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -726,14 +640,20 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     justifyContent: 'space-between',
-    paddingVertical: 50,
+  },
+  headerContainer: {
+    width: '100%',
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    backgroundColor: 'rgba(9, 13, 31, 0.55)',
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 15 : 10,
   },
   closeBtn: {
     width: 44,
@@ -779,24 +699,29 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     fontFamily: Typography.fonts.semibold,
   },
-  bottomContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
   instructionWrapper: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
   },
   instructionText: {
-    color: '#FFF',
+    color: 'rgba(255, 255, 255, 0.95)',
     fontSize: Typography.size.base - 1,
     fontFamily: Typography.fonts.semibold,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.95)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 3,
     paddingHorizontal: Spacing.md,
+  },
+  instructionTextAligned: {
+    color: Colors.primary,
+    fontFamily: Typography.fonts.bold,
+  },
+  bottomContainer: {
+    width: '100%',
+    backgroundColor: 'rgba(9, 13, 31, 0.55)',
+    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+    paddingTop: Spacing.md,
+    borderTopWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   bottomControls: {
     flexDirection: 'row',
@@ -804,7 +729,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 20,
   },
   actionBtn: {
     flexDirection: 'row',
