@@ -25,6 +25,7 @@ import { pacientesService } from '../services/pacientes.service';
 import { styles } from './CargarImagenScreen.styles';
 import { formatLocalDate } from '../utils/helpers';
 import { ZoomViewerModal } from '../features/analisis/components/ZoomViewerModal';
+import { CameraLevelerModal } from '../components/CameraLevelerModal';
 
 type ImageSource = 'dicom' | 'galeria' | 'camara' | null;
 
@@ -34,6 +35,7 @@ export default function CargarImagenScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<ImageSource>(null);
   const [showFullImage, setShowFullImage] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   
   // Estado para la fecha de la placa
   const [fechaPlaca, setFechaPlaca] = useState<Date>(new Date());
@@ -108,21 +110,8 @@ export default function CargarImagenScreen() {
     }
   };
 
-  const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      useToastStore.getState().showToast('Permiso requerido', 'Se necesita acceso a la cámara.', 'warning');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true, 
-      aspect: [4, 3], // Cuadro de recorte rectangular horizontal para evitar "rebote"
-      quality: 0.95,
-    });
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-      setSelectedSource('camara');
-    }
+  const takePhoto = () => {
+    setShowCameraModal(true);
   };
 
   const handleDICOM = () => {
@@ -328,6 +317,17 @@ export default function CargarImagenScreen() {
           imageUri={imageUri ?? undefined}
         />
       )}
+
+      {/* Modal de cámara con nivelador de giroscopio */}
+      <CameraLevelerModal
+        visible={showCameraModal}
+        onPhotoTaken={(uri) => {
+          setImageUri(uri);
+          setSelectedSource('camara');
+          setShowCameraModal(false);
+        }}
+        onCancel={() => setShowCameraModal(false)}
+      />
     </LinearGradient>
   );
 }
