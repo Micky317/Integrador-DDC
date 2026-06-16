@@ -117,9 +117,18 @@ def _generar_reporte_clinico(img: np.ndarray, puntos: np.ndarray, pacienteId: Op
     draw_point(img, c_y_izq, (255, 0, 0), " Y")
     draw_point(img, c_y_der, (255, 0, 0), " Y")
     
-    # Perkins
-    cv2.line(img, (techo_izq[0], 0), (techo_izq[0], img.shape[0]), (100, 100, 255), 2, cv2.LINE_AA)
-    cv2.line(img, (techo_der[0], 0), (techo_der[0], img.shape[0]), (100, 100, 255), 2, cv2.LINE_AA)
+    # Perkins (perpendiculares a la inclinación de Hilgenreiner)
+    if x2 != x1:
+        x_top_izq = int(techo_izq[0] + m * techo_izq[1])
+        x_bot_izq = int(techo_izq[0] - m * (img.shape[0] - techo_izq[1]))
+        cv2.line(img, (x_top_izq, 0), (x_bot_izq, img.shape[0]), (100, 100, 255), 2, cv2.LINE_AA)
+
+        x_top_der = int(techo_der[0] + m * techo_der[1])
+        x_bot_der = int(techo_der[0] - m * (img.shape[0] - techo_der[1]))
+        cv2.line(img, (x_top_der, 0), (x_bot_der, img.shape[0]), (100, 100, 255), 2, cv2.LINE_AA)
+    else:
+        cv2.line(img, (0, techo_izq[1]), (img.shape[1], techo_izq[1]), (100, 100, 255), 2, cv2.LINE_AA)
+        cv2.line(img, (0, techo_der[1]), (img.shape[1], techo_der[1]), (100, 100, 255), 2, cv2.LINE_AA)
     draw_point(img, techo_izq, (0, 255, 255), " TB")
     draw_point(img, techo_der, (0, 255, 255), " TB")
 

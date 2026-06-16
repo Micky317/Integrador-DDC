@@ -81,9 +81,21 @@ def main():
         # 1. HILGENREINER
         cv2.line(img, (0, c_y_izq[1]), (img.shape[1], c_y_der[1]), COLOR_HILGENREINER, 2, cv2.LINE_AA)
         
-        # 2. PERKINS
-        cv2.line(img, (techo_izq[0], 0), (techo_izq[0], img.shape[0]), COLOR_PERKINS, 2, cv2.LINE_AA)
-        cv2.line(img, (techo_der[0], 0), (techo_der[0], img.shape[0]), COLOR_PERKINS, 2, cv2.LINE_AA)
+        # 2. PERKINS (perpendiculares a la inclinada de Hilgenreiner)
+        x1, y1 = c_y_izq
+        x2, y2 = c_y_der
+        if x2 != x1:
+            m = (y2 - y1) / (x2 - x1)
+            x_top_izq = int(techo_izq[0] + m * techo_izq[1])
+            x_bot_izq = int(techo_izq[0] - m * (img.shape[0] - techo_izq[1]))
+            cv2.line(img, (x_top_izq, 0), (x_bot_izq, img.shape[0]), COLOR_PERKINS, 2, cv2.LINE_AA)
+
+            x_top_der = int(techo_der[0] + m * techo_der[1])
+            x_bot_der = int(techo_der[0] - m * (img.shape[0] - techo_der[1]))
+            cv2.line(img, (x_top_der, 0), (x_bot_der, img.shape[0]), COLOR_PERKINS, 2, cv2.LINE_AA)
+        else:
+            cv2.line(img, (techo_izq[0], 0), (techo_izq[0], img.shape[0]), COLOR_PERKINS, 2, cv2.LINE_AA)
+            cv2.line(img, (techo_der[0], 0), (techo_der[0], img.shape[0]), COLOR_PERKINS, 2, cv2.LINE_AA)
 
         # 3. TECHO ACETABULAR
         cv2.line(img, c_y_izq, techo_izq, COLOR_ACETABULAR, 3, cv2.LINE_AA)

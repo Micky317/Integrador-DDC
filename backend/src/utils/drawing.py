@@ -55,9 +55,18 @@ def annotate_image(img: np.ndarray, puntos: np.ndarray) -> tuple[np.ndarray, flo
     # 1. Línea de Hilgenreiner (pasando exactamente por ambos cartílagos Y)
     cv2.line(img, (0, y_start), (w, y_end), (250, 206, 135), 2, cv2.LINE_AA)
 
-    # 2. Líneas de Perkins (verticales, rojo suave)
-    cv2.line(img, (techo_izq[0], 0), (techo_izq[0], h), (100, 100, 255), 2, cv2.LINE_AA)
-    cv2.line(img, (techo_der[0], 0), (techo_der[0], h), (100, 100, 255), 2, cv2.LINE_AA)
+    # 2. Líneas de Perkins (perpendiculares a Hilgenreiner, rojo suave)
+    if x2 != x1:
+        x_top_izq = int(techo_izq[0] + m * techo_izq[1])
+        x_bot_izq = int(techo_izq[0] - m * (h - techo_izq[1]))
+        cv2.line(img, (x_top_izq, 0), (x_bot_izq, h), (100, 100, 255), 2, cv2.LINE_AA)
+
+        x_top_der = int(techo_der[0] + m * techo_der[1])
+        x_bot_der = int(techo_der[0] - m * (h - techo_der[1]))
+        cv2.line(img, (x_top_der, 0), (x_bot_der, h), (100, 100, 255), 2, cv2.LINE_AA)
+    else:
+        cv2.line(img, (0, techo_izq[1]), (w, techo_izq[1]), (100, 100, 255), 2, cv2.LINE_AA)
+        cv2.line(img, (0, techo_der[1]), (w, techo_der[1]), (100, 100, 255), 2, cv2.LINE_AA)
 
     # 3. Techo acetabular (verde, más grueso)
     cv2.line(img, c_y_izq, techo_izq, (100, 230, 100), 3, cv2.LINE_AA)
