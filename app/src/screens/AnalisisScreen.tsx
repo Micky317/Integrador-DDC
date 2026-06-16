@@ -31,9 +31,18 @@ export default function AnalisisScreen() {
   const params = useLocalSearchParams<{ imageUri?: string; pacienteId?: string; modoRapido?: string; analisisId?: string }>();
   const esRapido = params.modoRapido === '1';
   const esHistorial = !!params.analisisId;
+
+  // Persistir la URI local para evitar que se pierda debido a actualizaciones de rutas de tabs
+  const [localImageUri, setLocalImageUri] = useState<string>(params.imageUri || '');
+
+  useEffect(() => {
+    if (params.imageUri && params.imageUri !== localImageUri) {
+      setLocalImageUri(params.imageUri);
+    }
+  }, [params.imageUri]);
   
   // Hooks custom de TanStack Query
-  const { data: iaResult, isLoading: isLoadingIA, isError: isErrorIA, error: errorIA } = useAnalisisIA(params.imageUri);
+  const { data: iaResult, isLoading: isLoadingIA, isError: isErrorIA, error: errorIA } = useAnalisisIA(localImageUri);
   const { data: dbResult, isLoading: isLoadingDB } = useAnalisisHistorial(params.analisisId);
   
   const recalcularMutation = useRecalcularAnalisis();
@@ -65,10 +74,10 @@ export default function AnalisisScreen() {
   const [puntosActivos, setPuntosActivos] = useState<KeyPoint[]>([]);
 
   useEffect(() => {
-    if (params.imageUri) {
-      Image.getSize(params.imageUri, (w, h) => setImgOriginalSize({ w, h }), (err) => console.warn(err));
+    if (localImageUri) {
+      Image.getSize(localImageUri, (w, h) => setImgOriginalSize({ w, h }), (err) => console.warn(err));
     }
-  }, [params.imageUri]);
+  }, [localImageUri]);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
@@ -84,7 +93,7 @@ export default function AnalisisScreen() {
   }, [isError]);
 
   const handleValidar = () => {
-    if (!iaResult || !params.imageUri || !params.pacienteId) {
+    if (!iaResult || !localImageUri || !params.pacienteId) {
       useToastStore.getState().showToast('Error', 'Faltan datos para guardar el análisis.', 'error');
       return;
     }
@@ -95,7 +104,7 @@ export default function AnalisisScreen() {
     setShowConfirmModal(false);
     guardarMutation.mutate({
       pacienteId: params.pacienteId!,
-      originalUri: params.imageUri!,
+      originalUri: localImageUri,
       result: iaResult!,
       fechaRadiografia: (params as any).fechaRadiografia,
     });
@@ -118,7 +127,7 @@ export default function AnalisisScreen() {
     ? displayData.imagen_anotada_url
     : (iaResult?.imagen_anotada_base64 
         ? `data:image/jpeg;base64,${iaResult.imagen_anotada_base64}` 
-        : params.imageUri);
+        : localImageUri);
 
   return (
     <LinearGradient colors={['#090D1F', '#0D1B3E']} style={styles.gradient}>
@@ -142,6 +151,7 @@ export default function AnalisisScreen() {
 
         {/* Tarjeta de Imagen Modular */}
         <AnalisisImageCard 
+          key={currentImageUri}
           uri={currentImageUri}
           isLoading={isLoading || guardarMutation.isPending}
           scanId={esHistorial ? dbResult?.scanId : undefined}
@@ -178,7 +188,7 @@ export default function AnalisisScreen() {
                 </View>
                 <PrimaryButton
                   title="Crear Expediente Médico"
-                  onPress={() => router.push({ pathname: '/(tabs)/nuevo-paciente', params: { imageUri: params.imageUri ?? '', analisisRapido: '1' } })}
+                  onPress={() => router.push({ pathname: '/(tabs)/nuevo-paciente', params: { imageUri: localImageUri || '', analisisRapido: '1' } })}
                   style={styles.validateBtn}
                 />
                 <PrimaryButton title="Ajustar Puntos Manualmente" onPress={handleAjustarManual} variant="secondary" />
@@ -199,27 +209,32 @@ export default function AnalisisScreen() {
       </ScrollView>
 
       {/* Modales Modulares */}
-      <ZoomViewerModal 
-        visible={showFullImage}
-        onClose={() => setShowFullImage(false)}
-        imageUri={currentImageUri}
-      />
+      {showFullImage && (
+        <ZoomViewerModal 
+          visible={showFullImage}
+          onClose={() => setShowFullImage(false)}
+          imageUri={currentImageUri}
+          originalSize={imgOriginalSize}
+        />
+      )}
 
-      <EditorPuntosModal
-        visible={showEditor}
-        onClose={() => setShowEditor(false)}
-        imageUri={params.imageUri || ''}
-        originalSize={imgOriginalSize}
-        puntos={puntosActivos}
-        setPuntos={setPuntosActivos}
-        calculando={recalcularMutation.isPending}
-        onSave={() => {
-          recalcularMutation.mutate(
-            { imageUri: params.imageUri!, puntos: puntosActivos },
-            { onSuccess: () => setShowEditor(false) }
-          );
-        }}
-      />
+      {showEditor && (
+        <EditorPuntosModal
+          visible={showEditor}
+          onClose={() => setShowEditor(false)}
+          imageUri={localImageUri}
+          originalSize={imgOriginalSize}
+          puntos={puntosActivos}
+          setPuntos={setPuntosActivos}
+          calculando={recalcularMutation.isPending}
+          onSave={() => {
+            recalcularMutation.mutate(
+              { imageUri: localImageUri, puntos: puntosActivos },
+              { onSuccess: () => setShowEditor(false) }
+            );
+          }}
+        />
+      )}
 
       {/* Modal de Confirmación de Guardado */}
       <Modal visible={showConfirmModal} animationType="fade" transparent={true}>

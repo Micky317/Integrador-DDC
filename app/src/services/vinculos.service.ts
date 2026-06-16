@@ -1,5 +1,8 @@
+import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Paciente } from '../types';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? 'http://localhost:8005' : 'http://192.168.0.2:8005');
 
 export const vinculosService = {
   /**
@@ -83,5 +86,45 @@ export const vinculosService = {
           edadGestacional: p.edad_gestacional,
         };
       });
+  },
+
+  /**
+   * Decodifica un código QR desde una imagen local (URI de la galería)
+   * llamando al endpoint del backend
+   */
+  async decodeQRFromImage(uri: string): Promise<string | null> {
+    try {
+      const formData = new FormData();
+      
+      // En React Native, el formato del archivo debe tener uri, name y type para multipart/form-data
+      formData.append('file', {
+        uri,
+        name: 'qr_code.jpg',
+        type: 'image/jpeg',
+      } as any);
+
+      const response = await fetch(`${API_URL}/clinical/decode-qr`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('Error al decodificar QR en backend:', errText);
+        return null;
+      }
+
+      const resJson = await response.json();
+      if (resJson.status === 'success') {
+        return resJson.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error en decodeQRFromImage:', error);
+      return null;
+    }
   }
 };

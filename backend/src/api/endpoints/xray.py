@@ -54,12 +54,57 @@ def _generar_reporte_clinico(img: np.ndarray, puntos: np.ndarray, pacienteId: Op
     if techo_izq == (0,0) or c_y_izq == (0,0) or techo_der == (0,0) or c_y_der == (0,0):
         raise HTTPException(status_code=422, detail="Falta visibilidad de un cartílago o techo.")
 
-    # Cálculos de ángulos
-    angulo_izq = calculate_acetabular_angle(techo_izq, c_y_izq)
-    angulo_der = calculate_acetabular_angle(techo_der, c_y_der)
+    # Cálculos de ángulos y dibujo alineado con la línea de Hilgenreiner inclinada
+    x1, y1 = c_y_izq
+    x2, y2 = c_y_der
+    
+    if x2 != x1:
+        m = (y2 - y1) / (x2 - x1)
+        y_start = int(y1 - m * x1)
+        y_end = int(y1 + m * (img.shape[1] - x1))
+        deg_H = math.degrees(math.atan2(y2 - y1, x2 - x1))
+    else:
+        y_start = y1
+        y_end = y2
+        deg_H = 0.0
 
-    p_horizontal_izq = (techo_izq[0], c_y_izq[1]) 
-    p_horizontal_der = (techo_der[0], c_y_der[1])
+    # Lado Izquierdo de la imagen (Cadera Derecha del paciente)
+    ref_izq = 180 + deg_H
+    deg_R_izq = math.degrees(math.atan2(techo_izq[1] - c_y_izq[1], techo_izq[0] - c_y_izq[0]))
+    
+    ref_izq_norm = (ref_izq + 360) % 360
+    deg_R_izq_norm = (deg_R_izq + 360) % 360
+    
+    diff_izq = abs(deg_R_izq_norm - ref_izq_norm)
+    if diff_izq > 180:
+        diff_izq = 360 - diff_izq
+    angulo_izq = diff_izq
+
+    if abs(deg_R_izq_norm - ref_izq_norm) <= 180:
+        start_izq = min(ref_izq_norm, deg_R_izq_norm)
+        end_izq = max(ref_izq_norm, deg_R_izq_norm)
+    else:
+        start_izq = max(ref_izq_norm, deg_R_izq_norm)
+        end_izq = min(ref_izq_norm, deg_R_izq_norm) + 360
+
+    # Lado Derecho de la imagen (Cadera Izquierda del paciente)
+    ref_der = deg_H
+    deg_R_der = math.degrees(math.atan2(techo_der[1] - c_y_der[1], techo_der[0] - c_y_der[0]))
+    
+    ref_der_norm = (ref_der + 360) % 360
+    deg_R_der_norm = (deg_R_der + 360) % 360
+    
+    diff_der = abs(deg_R_der_norm - ref_der_norm)
+    if diff_der > 180:
+        diff_der = 360 - diff_der
+    angulo_der = diff_der
+
+    if abs(deg_R_der_norm - ref_der_norm) <= 180:
+        start_der = min(ref_der_norm, deg_R_der_norm)
+        end_der = max(ref_der_norm, deg_R_der_norm)
+    else:
+        start_der = max(ref_der_norm, deg_R_der_norm)
+        end_der = min(ref_der_norm, deg_R_der_norm) + 360
 
     # Diagnósticos
     st_izq = "NORMAL" if angulo_izq < 28 else ("LIMITROFE" if angulo_izq < 30 else "DISPLASIA")
@@ -67,19 +112,24 @@ def _generar_reporte_clinico(img: np.ndarray, puntos: np.ndarray, pacienteId: Op
     c_izq = (100, 255, 100) if st_izq == "NORMAL" else (100, 100, 255)
     c_der = (100, 255, 100) if st_der == "NORMAL" else (100, 100, 255)
 
-    # DIBUJO ORIGINAL DE WEBAPP.PY
-    cv2.line(img, (0, c_y_izq[1]), (img.shape[1], c_y_der[1]), (250, 206, 135), 2, cv2.LINE_AA)
+    # Dibujar Hilgenreiner pasando exactamente por ambos Y
+    cv2.line(img, (0, y_start), (img.shape[1], y_end), (250, 206, 135), 2, cv2.LINE_AA)
     draw_point(img, c_y_izq, (255, 0, 0), " Y")
     draw_point(img, c_y_der, (255, 0, 0), " Y")
+    
+    # Perkins
     cv2.line(img, (techo_izq[0], 0), (techo_izq[0], img.shape[0]), (100, 100, 255), 2, cv2.LINE_AA)
     cv2.line(img, (techo_der[0], 0), (techo_der[0], img.shape[0]), (100, 100, 255), 2, cv2.LINE_AA)
     draw_point(img, techo_izq, (0, 255, 255), " TB")
     draw_point(img, techo_der, (0, 255, 255), " TB")
 
+    # Techos acetabulares
     cv2.line(img, c_y_izq, techo_izq, (120, 255, 120), 4, cv2.LINE_AA)
     cv2.line(img, c_y_der, techo_der, (120, 255, 120), 4, cv2.LINE_AA)
-    draw_angle_arc(img, c_y_izq, radius=60, start_angle=180, end_angle=180+angulo_izq*1.2, color=(0, 255, 0))
-    draw_angle_arc(img, c_y_der, radius=60, start_angle=360-angulo_der*1.2, end_angle=360, color=(0, 255, 0))
+    
+    # Arcos de ángulo
+    draw_angle_arc(img, c_y_izq, radius=60, start_angle=int(start_izq), end_angle=int(end_izq), color=(0, 255, 0))
+    draw_angle_arc(img, c_y_der, radius=60, start_angle=int(start_der), end_angle=int(end_der), color=(0, 255, 0))
 
     # HUD Médico Final (Parte inferior)
     h = img.shape[0]

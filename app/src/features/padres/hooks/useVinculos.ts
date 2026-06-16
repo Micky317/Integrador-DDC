@@ -67,5 +67,6 @@ export function useVinculosPadre() {
     isLoading,
     vincular: vincularMutation.mutate,
     isLinking: vincularMutation.isPending,
+    decodeQRFromImage: vinculosService.decodeQRFromImage,
   };
 }

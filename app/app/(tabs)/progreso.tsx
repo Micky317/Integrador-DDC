@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../src/constants/theme';
 import { GlassContainer } from '../../src/components/GlassContainer';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
@@ -14,13 +16,16 @@ import { useAppStore } from '../../src/store/useAppStore';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function MisBebesScreen() {
-  const { misBebes, isLoading, vincular, isLinking } = useVinculosPadre();
+  const { misBebes, isLoading, vincular, isLinking, decodeQRFromImage } = useVinculosPadre();
   const { user } = useAppStore();
   
   // Registrar e iniciar notificaciones locales para el padre
   useNotificacionesPadre(misBebes);
   const [showModal, setShowModal] = useState(false);
   const [codigo, setCodigo] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [isDecodingImage, setIsDecodingImage] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const handleCloseModal = () => {
     setShowModal(false);
@@ -34,6 +39,103 @@ export default function MisBebesScreen() {
         handleCloseModal();
       }
     });
+  };
+
+  // Pedir permisos de cámara proactivamente cuando se abre el modal principal de vinculación
+  React.useEffect(() => {
+    if (showModal) {
+      (async () => {
+        try {
+          if (!permission?.granted) {
+            await requestPermission();
+          }
+        } catch (e) {
+          console.warn('Error solicitando permisos de cámara proactivamente:', e);
+        }
+      })();
+    }
+  }, [showModal]);
+
+  const handleOpenScanner = async () => {
+    try {
+      let granted = permission?.granted;
+      if (!granted) {
+        const res = await requestPermission();
+        granted = res.granted;
+      }
+      
+      // Cerramos el primer modal antes de abrir el escáner para evitar conflictos de Modals superpuestos en iOS/Android
+      setShowModal(false);
+      
+      setTimeout(() => {
+        setIsScanning(true);
+      }, 300);
+    } catch (err: any) {
+      console.error('[Scanner] Error en handleOpenScanner:', err);
+      setShowModal(false);
+      setTimeout(() => {
+        setIsScanning(true);
+      }, 300);
+    }
+  };
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    setIsScanning(false);
+    if (data) {
+      let code = data.trim();
+      if (code.includes('/')) {
+        const parts = code.split('/');
+        code = parts[parts.length - 1];
+      }
+      setCodigo(code.toUpperCase());
+    }
+    
+    // Reabrimos el modal original tras un breve delay para que la cámara termine de desmontarse
+    setTimeout(() => {
+      setShowModal(true);
+    }, 350);
+  };
+
+  const handleSelectFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso de Galería', 'Se requiere acceso a tu galería para cargar una imagen.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const uri = result.assets[0].uri;
+      setIsDecodingImage(true);
+      
+      const decodedCode = await decodeQRFromImage(uri);
+      setIsDecodingImage(false);
+
+      if (decodedCode) {
+        let code = decodedCode.trim();
+        if (code.includes('/')) {
+          const parts = code.split('/');
+          code = parts[parts.length - 1];
+        }
+        setCodigo(code.toUpperCase());
+        Alert.alert('Código QR Encontrado', `Se detectó el código: ${code}`);
+      } else {
+        Alert.alert('Error', 'No se pudo detectar ningún código QR en la imagen seleccionada. Por favor, asegúrate de que sea una foto clara del código QR.');
+      }
+    } catch (err) {
+      setIsDecodingImage(false);
+      console.error(err);
+      Alert.alert('Error', 'Ocurrió un error al intentar procesar la imagen de la galería.');
+    }
   };
 
   const renderEducationalCards = () => {
@@ -191,7 +293,30 @@ export default function MisBebesScreen() {
 
             <Ionicons name="link" size={40} color={Colors.primary} style={{ marginBottom: 16 }} />
             <Text style={styles.modalTitle}>Vincular Bebé</Text>
-            <Text style={styles.modalDesc}>El médico te proporcionó un código único para cada paciente.</Text>
+            <Text style={styles.modalDesc}>Escanea el código QR proporcionado por el médico o ingrésalo manualmente.</Text>
+
+            {/* Opciones de Escaneo */}
+            <View style={styles.qrOptionsRow}>
+              <TouchableOpacity style={styles.qrOptionBtn} onPress={handleOpenScanner}>
+                <Ionicons name="camera" size={20} color={Colors.primary} />
+                <Text style={styles.qrOptionText}>Escanear QR</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.qrOptionBtn} onPress={handleSelectFromGallery} disabled={isDecodingImage}>
+                {isDecodingImage ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <Ionicons name="images" size={20} color={Colors.primary} />
+                )}
+                <Text style={styles.qrOptionText}>Cargar de Galería</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>o escribe el código</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
             <TextInput
               style={styles.input}
@@ -210,6 +335,54 @@ export default function MisBebesScreen() {
               disabled={!codigo || isLinking}
               style={{ width: '100%' }}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para el escáner de cámara */}
+      <Modal
+        visible={isScanning}
+        animationType="slide"
+        onRequestClose={() => {
+          setIsScanning(false);
+          setTimeout(() => {
+            setShowModal(true);
+          }, 350);
+        }}
+      >
+        <View style={styles.scannerContainer}>
+          <CameraView
+            style={StyleSheet.absoluteFillObject}
+            barcodeScannerSettings={{
+              barcodeTypes: ['qr'],
+            }}
+            onBarcodeScanned={handleBarcodeScanned}
+          />
+          <View style={styles.scannerOverlay}>
+            <View style={styles.scannerHeader}>
+              <TouchableOpacity
+                style={styles.scannerCloseBtn}
+                onPress={() => {
+                  setIsScanning(false);
+                  setTimeout(() => {
+                    setShowModal(true);
+                  }, 350);
+                }}
+              >
+                <Ionicons name="arrow-back" size={24} color="#FFF" />
+              </TouchableOpacity>
+              <Text style={styles.scannerTitle}>Escanear Código QR</Text>
+              <View style={{ width: 40 }} />
+            </View>
+
+            <View style={styles.scanTargetZone}>
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
+            </View>
+
+            <Text style={styles.scannerHint}>Alinea el código QR dentro del recuadro</Text>
           </View>
         </View>
       </Modal>
@@ -293,7 +466,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: Spacing.xl },
   modalCard: { backgroundColor: Colors.bgCard, borderRadius: Radius.xl, padding: Spacing.xl, alignItems: 'center' },
   modalTitle: { color: Colors.textPrimary, fontSize: Typography.size.lg, fontWeight: Typography.weight.bold, marginBottom: 8 },
-  modalDesc: { color: Colors.textSecondary, fontSize: Typography.size.sm, textAlign: 'center', marginBottom: 24, lineHeight: 18 },
+  modalDesc: { color: Colors.textSecondary, fontSize: Typography.size.sm, textAlign: 'center', marginBottom: Spacing.lg, lineHeight: 18 },
   closeBtn: { position: 'absolute', top: 16, right: 16 },
   input: {
     width: '100%',
@@ -308,5 +481,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 2,
     marginBottom: Spacing.xl
-  }
+  },
+
+  // QR Options in Modal
+  qrOptionsRow: { flexDirection: 'row', gap: 12, width: '100%', marginBottom: Spacing.md },
+  qrOptionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.bgCardLight, borderWidth: 1, borderColor: Colors.borderDefault, borderRadius: Radius.md, paddingVertical: 12 },
+  qrOptionText: { color: Colors.textPrimary, fontSize: Typography.size.sm, fontWeight: Typography.weight.medium },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginVertical: Spacing.sm, marginBottom: Spacing.md },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.borderDefault },
+  dividerText: { color: Colors.textMuted, fontSize: Typography.size.xs, paddingHorizontal: 8, textTransform: 'uppercase' },
+
+  // Scanner Styles
+  scannerContainer: { flex: 1, backgroundColor: '#000' },
+  scannerOverlay: { flex: 1, justifyContent: 'space-between', padding: Spacing.xl, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  scannerHeader: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center', paddingTop: 50 },
+  scannerCloseBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  scannerTitle: { color: '#FFF', fontSize: Typography.size.md, fontWeight: Typography.weight.semibold },
+  scanTargetZone: { width: 240, height: 240, position: 'relative', justifyContent: 'center', alignItems: 'center' },
+  scannerHint: { color: 'rgba(255,255,255,0.8)', fontSize: Typography.size.sm, textAlign: 'center', marginBottom: 60, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.sm },
+  corner: { position: 'absolute', width: 24, height: 24, borderColor: Colors.primary, borderWidth: 3 },
+  topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+  topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+  bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+  bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
 });

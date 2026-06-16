@@ -76,3 +76,49 @@ export const formatRecoveryTime = (months: number): string => {
   return `${m} ${m === 1 ? 'mes' : 'meses'} y ${d} ${d === 1 ? 'día' : 'días'}`;
 };
 
+/**
+ * Convierte cualquier fecha en formato legible (DD/MM/YY, DD/MM/YYYY, etc.)
+ * a formato estándar PostgreSQL YYYY-MM-DD.
+ */
+export const formatToPostgresDate = (dateStr: string | undefined): string | null => {
+  if (!dateStr) return null;
+  const cleaned = dateStr.trim();
+  if (!cleaned) return null;
+
+  // 1. Caso YYYY-MM-DD o YYYY/MM/DD
+  const yyyymmdd = /^\d{4}[-/](\d{1,2})[-/](\d{1,2})$/;
+  const matchY = cleaned.match(yyyymmdd);
+  if (matchY) {
+    const [_, month, day] = matchY;
+    const year = cleaned.substring(0, 4);
+    const paddedMonth = month.padStart(2, '0');
+    const paddedDay = day.padStart(2, '0');
+    return `${year}-${paddedMonth}-${paddedDay}`;
+  }
+
+  // 2. Caso DD-MM-YYYY o DD/MM/YYYY
+  const ddmmyyyy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/;
+  const matchD = cleaned.match(ddmmyyyy);
+  if (matchD) {
+    const [_, day, month, year] = matchD;
+    const paddedDay = day.padStart(2, '0');
+    const paddedMonth = month.padStart(2, '0');
+    return `${year}-${paddedMonth}-${paddedDay}`;
+  }
+
+  // 3. Caso DD-MM-YY o DD/MM/YY (año de 2 dígitos)
+  const ddmmyy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/;
+  const matchD2 = cleaned.match(ddmmyy);
+  if (matchD2) {
+    const [_, day, month, year2] = matchD2;
+    const paddedDay = day.padStart(2, '0');
+    const paddedMonth = month.padStart(2, '0');
+    
+    // Asumir que el año es en el siglo 21 (20YY)
+    const year = `20${year2}`;
+    return `${year}-${paddedMonth}-${paddedDay}`;
+  }
+
+  return cleaned;
+};
+

@@ -56,6 +56,7 @@ export default function ConfiguracionScreen() {
     {
       icon: 'log-out-outline',
       label: 'Cerrar Sesión',
+      sub: 'Cerrar la sesión de la cuenta actual',
       onPress: () =>
         Alert.alert('¿Cerrar sesión?', '', [
           { text: 'Cancelar', style: 'cancel' },
@@ -93,9 +94,11 @@ export default function ConfiguracionScreen() {
               </Text>
               {item.sub && <Text style={styles.rowSub}>{item.sub}</Text>}
             </View>
-            {!item.danger && (
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
-            )}
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={item.danger ? `${Colors.statusDanger}66` : Colors.textMuted}
+            />
           </TouchableOpacity>
         ))}
       </ScrollView>

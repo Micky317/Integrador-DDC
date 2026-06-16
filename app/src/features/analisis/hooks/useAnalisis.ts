@@ -12,6 +12,7 @@ export function useAnalisisIA(imageUri?: string) {
     queryKey: ['analisisIA', imageUri],
     queryFn: async () => {
       if (!imageUri) throw new Error('No image URI provided');
+      console.log('QUERY FETCHING FOR KEY:', ['analisisIA', imageUri]);
       return await analizarRadiografiaApi(imageUri);
     },
     enabled: !!imageUri,
@@ -37,8 +38,10 @@ export function useRecalcularAnalisis() {
     mutationFn: ({ imageUri, puntos }: { imageUri: string; puntos: KeyPoint[] }) => 
       recalculateRadiografiaApi(imageUri, puntos),
     onSuccess: (data, variables) => {
+      console.log('MUTATION SUCCESS - SETTING CACHE FOR KEY:', ['analisisIA', variables.imageUri]);
       queryClient.setQueryData(['analisisIA', variables.imageUri], data);
-    }
+    },
+    onError: (error: any) => handleError(error, 'Recálculo de Puntos')
   });
 }
 

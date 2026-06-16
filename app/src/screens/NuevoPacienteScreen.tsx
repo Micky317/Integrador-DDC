@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Share, Linking, Alert } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Share, Linking, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,10 +12,37 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useNuevoPaciente } from '../features/pacientes/hooks/useNuevoPaciente';
 import { PrimaryButton } from '../components/PrimaryButton';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function NuevoPacienteScreen() {
   const { state, setters, handleContinuar, proceedToFeature } = useNuevoPaciente();
   const qrRef = useRef<any>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const parseInputDate = (dateStr: string): Date => {
+    try {
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        let year = parseInt(parts[2], 10);
+        if (year < 100) year += 2000;
+        const d = new Date(year, month, day);
+        if (!isNaN(d.getTime())) return d;
+      }
+    } catch (e) {}
+    return new Date();
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const year = selectedDate.getFullYear();
+      setters.setFechaNac(`${day}/${month}/${year}`);
+    }
+  };
 
   const handleShare = async () => {
     if (!state.successData || !qrRef.current) return;
@@ -94,13 +121,20 @@ export default function NuevoPacienteScreen() {
             onChangeText={setters.setNombreCompleto}
           />
           <View style={styles.rowInputs}>
-            <AppInput
-              placeholder="12/05/24"
-              value={state.fechaNac}
-              onChangeText={setters.setFechaNac}
-              containerStyle={styles.inputHalf}
-              rightIcon="calendar-outline"
-            />
+            <TouchableOpacity 
+              style={styles.inputHalf} 
+              activeOpacity={0.7}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <View pointerEvents="none">
+                <AppInput
+                  placeholder="12/05/24"
+                  value={state.fechaNac}
+                  editable={false}
+                  rightIcon="calendar-outline"
+                />
+              </View>
+            </TouchableOpacity>
             {/* Sexo Selector */}
             <View style={styles.sexoSelector}>
               <Text style={styles.sexoLabel}>Sexo</Text>
@@ -219,6 +253,42 @@ export default function NuevoPacienteScreen() {
           </View>
         </View>
       </Modal>
+
+      {showDatePicker && Platform.OS === 'ios' && (
+        <Modal transparent={true} visible={showDatePicker} animationType="fade">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ backgroundColor: Colors.bgCard, borderRadius: Radius.lg, padding: Spacing.lg, width: '90%', alignItems: 'center', borderWidth: 1, borderColor: Colors.borderCard }}>
+              <Text style={{ color: Colors.textPrimary, fontSize: 16, fontWeight: 'bold', marginBottom: 15 }}>
+                Seleccionar Fecha
+              </Text>
+              <DateTimePicker
+                value={state.fechaNac ? parseInputDate(state.fechaNac) : new Date()}
+                mode="date"
+                display="inline"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+                themeVariant="dark"
+              />
+              <TouchableOpacity 
+                onPress={() => setShowDatePicker(false)} 
+                style={{ marginTop: 15, backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 30, width: '100%', alignItems: 'center' }}
+              >
+                <Text style={{ color: Colors.bgDeep, fontWeight: 'bold' }}>Aceptar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {showDatePicker && Platform.OS !== 'ios' && (
+        <DateTimePicker
+          value={state.fechaNac ? parseInputDate(state.fechaNac) : new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          maximumDate={new Date()}
+        />
+      )}
 
     </LinearGradient>
   );

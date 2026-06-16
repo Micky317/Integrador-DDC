@@ -39,8 +39,21 @@ def annotate_image(img: np.ndarray, puntos: np.ndarray) -> tuple[np.ndarray, flo
 
     h, w = img.shape[:2]
 
-    # 1. Línea de Hilgenreiner (horizontal, celeste)
-    cv2.line(img, (0, c_y_izq[1]), (w, c_y_der[1]), (250, 206, 135), 2, cv2.LINE_AA)
+    x1, y1 = c_y_izq
+    x2, y2 = c_y_der
+    
+    if x2 != x1:
+        m = (y2 - y1) / (x2 - x1)
+        y_start = int(y1 - m * x1)
+        y_end = int(y1 + m * (w - x1))
+        deg_H = math.degrees(math.atan2(y2 - y1, x2 - x1))
+    else:
+        y_start = y1
+        y_end = y2
+        deg_H = 0.0
+
+    # 1. Línea de Hilgenreiner (pasando exactamente por ambos cartílagos Y)
+    cv2.line(img, (0, y_start), (w, y_end), (250, 206, 135), 2, cv2.LINE_AA)
 
     # 2. Líneas de Perkins (verticales, rojo suave)
     cv2.line(img, (techo_izq[0], 0), (techo_izq[0], h), (100, 100, 255), 2, cv2.LINE_AA)
@@ -56,9 +69,24 @@ def annotate_image(img: np.ndarray, puntos: np.ndarray) -> tuple[np.ndarray, flo
     draw_point(img, techo_izq, (0, 230, 230), " TB")
     draw_point(img, techo_der, (0, 230, 230), " TB")
 
-    # 5. Cálculo de ángulos
-    angulo_izq = calculate_acetabular_angle(techo_izq, c_y_izq)
-    angulo_der = calculate_acetabular_angle(techo_der, c_y_der)
+    # 5. Cálculo de ángulos (alineados con la inclinación de Hilgenreiner)
+    ref_izq = 180 + deg_H
+    deg_R_izq = math.degrees(math.atan2(techo_izq[1] - c_y_izq[1], techo_izq[0] - c_y_izq[0]))
+    ref_izq_norm = (ref_izq + 360) % 360
+    deg_R_izq_norm = (deg_R_izq + 360) % 360
+    diff_izq = abs(deg_R_izq_norm - ref_izq_norm)
+    if diff_izq > 180:
+        diff_izq = 360 - diff_izq
+    angulo_izq = diff_izq
+
+    ref_der = deg_H
+    deg_R_der = math.degrees(math.atan2(techo_der[1] - c_y_der[1], techo_der[0] - c_y_der[0]))
+    ref_der_norm = (ref_der + 360) % 360
+    deg_R_der_norm = (deg_R_der + 360) % 360
+    diff_der = abs(deg_R_der_norm - ref_der_norm)
+    if diff_der > 180:
+        diff_der = 360 - diff_der
+    angulo_der = diff_der
 
     dx_izq = get_diagnostico(angulo_izq)
     dx_der = get_diagnostico(angulo_der)

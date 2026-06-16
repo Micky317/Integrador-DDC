@@ -6,6 +6,7 @@ import { pacientesService } from '../../../services/pacientes.service';
 import { useAppStore } from '../../../store/useAppStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { handleError } from '../../../utils/errorHandler';
+import { formatToPostgresDate } from '../../../utils/helpers';
 
 export function useNuevoPaciente() {
   const { user } = useAppStore();
@@ -90,7 +91,7 @@ export function useNuevoPaciente() {
 
     mutation.mutate({
       nombreCompleto,
-      fechaNacimiento: fechaNac,
+      fechaNacimiento: formatToPostgresDate(fechaNac) || fechaNac,
       sexo,
       edadGestacional: edadGestacional ? parseInt(edadGestacional) : undefined,
       nombreTutor,
@@ -98,7 +99,6 @@ export function useNuevoPaciente() {
       presentacionNalgas,
       antecedenteFamiliar,
       doctorId: user?.id,
-      codigoPaciente: `P-${Math.floor(1000 + Math.random() * 9000)}`
     });
   };
 

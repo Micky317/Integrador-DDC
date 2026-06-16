@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
+import cv2
+import numpy as np
 from src.analytics_service import analytics
 
 router = APIRouter()
@@ -62,3 +64,33 @@ async def get_patient_projection(id: str, granularity: str = "meses"):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno al calcular la proyección: {str(e)}")
+
+@router.post("/decode-qr")
+async def decode_qr_endpoint(file: UploadFile = File(...)):
+    """
+    Recibe una imagen y decodifica el código QR utilizando OpenCV.
+    """
+    try:
+        contents = await file.read()
+        nparr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            raise HTTPException(status_code=400, detail="No se pudo decodificar la imagen.")
+            
+        detector = cv2.QRCodeDetector()
+        data, bbox, _ = detector.detectAndDecode(img)
+        
+        # Si no lo encuentra, intentamos convertir a escala de grises para mejorar contraste
+        if not data:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            data, bbox, _ = detector.detectAndDecode(gray)
+            
+        if not data:
+            raise HTTPException(status_code=404, detail="No se encontró ningún código QR en la imagen.")
+            
+        return {"status": "success", "data": data}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al procesar el código QR: {str(e)}")

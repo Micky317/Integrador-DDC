@@ -321,11 +321,13 @@ export default function CargarImagenScreen() {
       </View>
 
       {/* Modal de Zoom antes de enviar a analizar */}
-      <ZoomViewerModal
-        visible={showFullImage}
-        onClose={() => setShowFullImage(false)}
-        imageUri={imageUri ?? undefined}
-      />
+      {showFullImage && (
+        <ZoomViewerModal
+          visible={showFullImage}
+          onClose={() => setShowFullImage(false)}
+          imageUri={imageUri ?? undefined}
+        />
+      )}
     </LinearGradient>
   );
 }

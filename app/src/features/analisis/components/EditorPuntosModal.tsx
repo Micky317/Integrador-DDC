@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Modal, ScrollView, Image, TouchableOpacity, PanResponder, Animated } from 'react-native';
+import { View, Text, Modal, ScrollView, Image, TouchableOpacity, PanResponder, Animated, Dimensions } from 'react-native';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const DraggablePoint = ({ point, originalSize, containerSize, onUpdate, zoomScale, scrollRef }: any) => {
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -100,19 +102,137 @@ const DraggablePoint = ({ point, originalSize, containerSize, onUpdate, zoomScal
 };
 
 export const EditorPuntosModal = ({ visible, onClose, imageUri, originalSize, puntos, setPuntos, onSave, calculando }: any) => {
-  const [containerSize, setContainerSize] = useState({ w: 100, h: 100 });
+  // 1. Declarar todos los hooks al inicio para respetar las reglas de React
+  const initialSize = (originalSize && originalSize.w && originalSize.h && originalSize.w !== 1000)
+    ? originalSize
+    : null;
+
+  const [measuredSize, setMeasuredSize] = useState<{ w: number; h: number } | null>(initialSize);
+
+  useEffect(() => {
+    if (!measuredSize && imageUri) {
+      Image.getSize(
+        imageUri,
+        (w, h) => setMeasuredSize({ w, h }),
+        () => setMeasuredSize(originalSize && originalSize.w && originalSize.h ? originalSize : { w: 1000, h: 750 })
+      );
+    }
+  }, [imageUri, measuredSize]);
+
+  // Relación de aspecto temporal para inicializar los hooks antes de cargar measuredSize
+  const effectiveAspect = (measuredSize && measuredSize.w && measuredSize.h)
+    ? (measuredSize.w / measuredSize.h)
+    : (originalSize && originalSize.w && originalSize.h ? originalSize.w / originalSize.h : 1.33);
+  const containerHeight = SCREEN_WIDTH / effectiveAspect;
+
+  const [containerSize, setContainerSize] = useState({ w: SCREEN_WIDTH, h: containerHeight });
   const [zoomScale, setZoomScale] = useState(1);
   const scrollRef = useRef<ScrollView>(null);
+  const [zoomKey, setZoomKey] = useState(Date.now());
+
+  // Zoom máximo controlado. Bajarlo momentáneamente a 1 fuerza al ScrollView
+  // a recortar el pinch-zoom actual de vuelta a 1 (no existe API directa para
+  // fijar el zoomScale por código).
+  const [maxZoom, setMaxZoom] = useState(5);
+
+  useEffect(() => {
+    setContainerSize({ w: SCREEN_WIDTH, h: containerHeight });
+  }, [containerHeight]);
+
+  useEffect(() => {
+    if (visible) {
+      setZoomKey(Date.now());
+      setZoomScale(1);
+      setMaxZoom(5);
+    }
+  }, [visible]);
+
+  // Restablece el zoom a su estado original y, una vez aplicado, ejecuta la
+  // acción del botón (cerrar o actualizar). Así la imagen vuelve a centrarse
+  // antes de salir y no arrastra el zoom al siguiente apartado.
+  const resetZoomThen = (action?: () => void) => {
+    try {
+      const responder = scrollRef.current?.getScrollResponder() as any;
+      if (responder) {
+        if (typeof responder.scrollResponderZoomTo === 'function') {
+          responder.scrollResponderZoomTo({
+            x: 0,
+            y: 0,
+            width: SCREEN_WIDTH,
+            height: containerHeight,
+            animated: true
+          });
+        } else if (typeof responder.zoomToRect === 'function') {
+          responder.zoomToRect({
+            x: 0,
+            y: 0,
+            width: SCREEN_WIDTH,
+            height: containerHeight,
+            animated: true
+          });
+        } else if (typeof responder.scrollTo === 'function') {
+          responder.scrollTo({ x: 0, y: 0, animated: true });
+        }
+      } else if (scrollRef.current) {
+        if (typeof (scrollRef.current as any).zoomToRect === 'function') {
+          (scrollRef.current as any).zoomToRect({
+            x: 0,
+            y: 0,
+            width: SCREEN_WIDTH,
+            height: containerHeight,
+            animated: true
+          });
+        } else {
+          scrollRef.current.scrollTo({ x: 0, y: 0, animated: true });
+        }
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+    
+    setTimeout(() => {
+      setMaxZoom(1);
+      setZoomScale(1);
+      setZoomKey(Date.now());
+      action?.();
+    }, 350);
+  };
+
+  // 2. Colocar todos los retornos condicionales después de los hooks
+  if (!visible) return null;
+
+  if (!measuredSize) {
+    return (
+      <Modal 
+        visible={visible} 
+        animationType="slide" 
+        transparent={false}
+        onRequestClose={() => onClose?.()}
+      >
+        <View style={{ flex: 1, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: '#00FFCC', fontSize: 16 }}>Cargando editor...</Text>
+        </View>
+      </Modal>
+    );
+  }
+
+  const displayHeight = SCREEN_HEIGHT - 140;
+  const paddingTop = containerHeight < displayHeight ? (displayHeight - containerHeight) / 2 : 0;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      transparent={false}
+      onRequestClose={() => resetZoomThen(onClose)}
+    >
       <View style={{ flex: 1, backgroundColor: '#111' }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingTop: 50, backgroundColor: '#222' }}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={() => resetZoomThen(onClose)} disabled={calculando}>
             <Text style={{ color: '#FFF', fontSize: 16 }}>Cancelar</Text>
           </TouchableOpacity>
           <Text style={{ color: '#00FFCC', fontSize: 16, fontWeight: 'bold' }}>Ajustar Puntos</Text>
-          <TouchableOpacity onPress={onSave} disabled={calculando}>
+          <TouchableOpacity onPress={() => resetZoomThen(onSave)} disabled={calculando}>
             <Text style={{ color: calculando ? '#888' : '#00FFCC', fontSize: 16, fontWeight: 'bold' }}>{calculando ? 'Calculando...' : 'Actualizar'}</Text>
           </TouchableOpacity>
         </View>
@@ -121,10 +241,14 @@ export const EditorPuntosModal = ({ visible, onClose, imageUri, originalSize, pu
         </Text>
 
         <ScrollView
+          key={`editor-scroll-${zoomKey}`}
           ref={scrollRef}
           style={{ flex: 1 }}
-          contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}
-          maximumZoomScale={5}
+          contentContainerStyle={{ 
+            paddingTop: paddingTop,
+            alignItems: 'center' 
+          }}
+          maximumZoomScale={maxZoom}
           minimumZoomScale={1}
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
@@ -134,20 +258,20 @@ export const EditorPuntosModal = ({ visible, onClose, imageUri, originalSize, pu
             if (scale) setZoomScale(scale);
           }}
         >
-            <View 
-              style={{ width: '100%', aspectRatio: originalSize.w / originalSize.h, position: 'relative' }}
+            <View
+              style={{ width: SCREEN_WIDTH, height: containerHeight, position: 'relative' }}
               onLayout={(e) => setContainerSize({w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height})}
             >
               {imageUri ? (
                   <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
               ) : null}
-              
-              {puntos.map((pt: any, i: number) => (
-                  <DraggablePoint 
+
+              {measuredSize && puntos.map((pt: any, i: number) => (
+                  <DraggablePoint
                       key={`pt-${pt.id}-${i}`}
-                      point={pt} 
-                      originalSize={originalSize} 
-                      containerSize={containerSize} 
+                      point={pt}
+                      originalSize={measuredSize}
+                      containerSize={containerSize}
                       zoomScale={zoomScale}
                       scrollRef={scrollRef}
                       onUpdate={(newPt: any) => {
