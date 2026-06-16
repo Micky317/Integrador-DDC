@@ -8,6 +8,7 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Accelerometer } from 'expo-sensors';
@@ -19,15 +20,10 @@ import { useToastStore } from '../store/useToastStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Dimensiones de la caja de encuadre (4:3 horizontal)
-const FRAME_WIDTH = SCREEN_WIDTH - Spacing.lg * 2;
-const FRAME_HEIGHT = (FRAME_WIDTH * 3) / 4;
-
-// Radio del nivelador burbuja
+// Diámetros del nivelador burbuja
 const LEVEL_RADIUS = 60; // Diámetro de 120px
 const BUBBLE_RADIUS = 10; // Diámetro de 20px
 const MAX_OFFSET = LEVEL_RADIUS - BUBBLE_RADIUS; // 50px de rango máximo de movimiento
-const TARGET_RADIUS = 10; // Radio del círculo central (umbral de 2 grados)
 
 interface CameraLevelerModalProps {
   visible: boolean;
@@ -44,20 +40,25 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   const [permission, requestPermission] = useCameraPermissions();
   const [isCapturing, setIsCapturing] = useState(false);
 
-  // Vectores de gravedad
+  // Vectores de gravedad (filtro pasa-bajos)
   const smoothX = useRef(0);
   const smoothY = useRef(0);
-  const smoothZ = useRef(-1); // Inicializamos apuntando hacia atrás por defecto
-  const alpha = 0.15; // Factor de suavizado del filtro pasa-bajos
+  const smoothZ = useRef(-1);
+  const alpha = 0.12; // Un poco más de suavizado para una experiencia más premium
 
-  // Estado para forzar re-renderizado del HUD con los datos del sensor
+  // Estado para refrescar la UI con la gravedad
   const [gravity, setGravity] = useState({ x: 0, y: 0, z: -1 });
 
-  // Vector de calibración (referencia)
+  // Detección automática de orientación del dispositivo (PORTRAIT, LANDSCAPE_LEFT, LANDSCAPE_RIGHT)
+  const [deviceOrientation, setDeviceOrientation] = useState<'PORTRAIT' | 'LANDSCAPE_LEFT' | 'LANDSCAPE_RIGHT'>('PORTRAIT');
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  // Estado de calibración
   const [calibratedGravity, setCalibratedGravity] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [isCalibrated, setIsCalibrated] = useState(false);
   const [isAligned, setIsAligned] = useState(false);
 
-  // Solicitar permisos al abrir el modal
+  // Solicitar permisos
   useEffect(() => {
     if (visible && !permission?.granted) {
       requestPermission();
@@ -69,11 +70,10 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     let subscription: any = null;
 
     if (visible && permission?.granted) {
-      // Configuramos el acelerómetro a ~30ms para animación fluida (aprox. 30 fps)
       Accelerometer.setUpdateInterval(30);
 
       subscription = Accelerometer.addListener((data) => {
-        // Filtro pasa-bajos para eliminar ruido de temblores de la mano
+        // 1. Filtro pasa-bajos
         smoothX.current = alpha * data.x + (1 - alpha) * smoothX.current;
         smoothY.current = alpha * data.y + (1 - alpha) * smoothY.current;
         smoothZ.current = alpha * data.z + (1 - alpha) * smoothZ.current;
@@ -83,101 +83,153 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
           y: smoothY.current,
           z: smoothZ.current,
         });
+
+        // 2. Detección de orientación con histéresis (evita parpadeos en diagonales)
+        const ax = data.x;
+        const ay = data.y;
+        if (Math.abs(ax) > 0.65) {
+          const targetOri = ax > 0 ? 'LANDSCAPE_LEFT' : 'LANDSCAPE_RIGHT';
+          setDeviceOrientation((prev) => (prev !== targetOri ? targetOri : prev));
+        } else if (Math.abs(ay) > 0.65) {
+          setDeviceOrientation((prev) => (prev !== 'PORTRAIT' ? 'PORTRAIT' : prev));
+        }
       });
     }
 
     return () => {
-      if (subscription) {
-        subscription.remove();
-      }
+      if (subscription) subscription.remove();
     };
   }, [visible, permission]);
 
-  // Función para normalizar vectores 3D
+  // Animar la rotación de los componentes de la interfaz
+  useEffect(() => {
+    let toValue = 0;
+    if (deviceOrientation === 'LANDSCAPE_LEFT') toValue = 1; // 90 grados
+    else if (deviceOrientation === 'LANDSCAPE_RIGHT') toValue = -1; // -90 grados
+
+    Animated.timing(rotateAnim, {
+      toValue,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+  }, [deviceOrientation]);
+
+  // Función para normalizar vectores
   const normalize = (v: { x: number; y: number; z: number }) => {
     const len = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
     if (len === 0) return { x: 0, y: 0, z: -1 };
     return { x: v.x / len, y: v.y / len, z: v.z / len };
   };
 
-  // Cálculos matemáticos del nivelador
+  // Función para obtener vector de gravedad ideal por defecto (Auto-calibración)
+  const getDefaultReference = (x: number, y: number, z: number, orientation: 'PORTRAIT' | 'LANDSCAPE_LEFT' | 'LANDSCAPE_RIGHT') => {
+    // Si el teléfono está plano (en mesa / superficie horizontal, predomina z)
+    if (Math.abs(z) > 0.75) {
+      return { x: 0, y: 0, z: z > 0 ? 1 : -1 };
+    }
+    // Si está vertical (negatoscopio en pared)
+    if (orientation === 'PORTRAIT') {
+      return { x: 0, y: y > 0 ? 1 : -1, z: 0 };
+    } else if (orientation === 'LANDSCAPE_LEFT') {
+      return { x: x > 0 ? 1 : -1, y: 0, z: 0 };
+    } else {
+      // LANDSCAPE_RIGHT
+      return { x: x > 0 ? 1 : -1, y: 0, z: 0 };
+    }
+  };
+
+  // Cálculos matemáticos del nivelador (burbuja)
   let angleDeg = 0;
   let bubbleX = 0;
   let bubbleY = 0;
+  let isAutoHorizontal = false;
 
-  if (calibratedGravity) {
-    const curNorm = normalize(gravity);
-    const refNorm = normalize(calibratedGravity);
+  const curNorm = normalize(gravity);
+  
+  // Si está calibrado manualmente usamos ese vector, si no calculamos el plano ideal en "Auto"
+  const refNorm = isCalibrated && calibratedGravity
+    ? normalize(calibratedGravity)
+    : normalize(getDefaultReference(gravity.x, gravity.y, gravity.z, deviceOrientation));
 
-    // Producto escalar para calcular el ángulo de desviación
-    const dot = curNorm.x * refNorm.x + curNorm.y * refNorm.y + curNorm.z * refNorm.z;
-    const clampedDot = Math.max(-1, Math.min(1, dot));
-    const angleRad = Math.acos(clampedDot);
-    angleDeg = angleRad * (180 / Math.PI);
-
-    // Construir base ortonormal para el plano de calibración
-    let tx = 1, ty = 0, tz = 0;
-    if (Math.abs(refNorm.x) > 0.9) {
-      tx = 0;
-      ty = 1;
-      tz = 0;
-    }
-
-    // u = refNorm x t
-    const ux = refNorm.y * tz - refNorm.z * ty;
-    const uy = refNorm.z * tx - refNorm.x * tz;
-    const uz = refNorm.x * ty - refNorm.y * tx;
-    const lenU = Math.sqrt(ux * ux + uy * uy + uz * uz);
-    const uNorm = { x: ux / lenU, y: uy / lenU, z: uz / lenU };
-
-    // v = refNorm x uNorm
-    const vx = refNorm.y * uNorm.z - refNorm.z * uNorm.y;
-    const vy = refNorm.z * uNorm.x - refNorm.x * uNorm.z;
-    const vz = refNorm.x * uNorm.y - refNorm.y * uNorm.x;
-
-    // Proyecciones sobre los ejes u y v del plano calibrado
-    const pu = curNorm.x * uNorm.x + curNorm.y * uNorm.y + curNorm.z * uNorm.z;
-    const pv = curNorm.x * vx + curNorm.y * vy + curNorm.z * vz;
-
-    // Mapeo lineal de la desviación (escala máxima a 15 grados)
-    const MAX_ANGLE_LIMIT = 15;
-    const deviation = Math.min(1.0, angleDeg / MAX_ANGLE_LIMIT);
-    const lenProj = Math.sqrt(pu * pu + pv * pv);
-
-    if (lenProj > 0) {
-      // Dirección del movimiento de la burbuja
-      const dirX = pu / lenProj;
-      const dirY = pv / lenProj;
-
-      // El signo negativo simula la burbuja flotando hacia la parte más alta (física de nivel)
-      // Ajustamos los ejes para que coincida intuitivamente con los movimientos del celular
-      bubbleX = -dirX * deviation * MAX_OFFSET;
-      bubbleY = dirY * deviation * MAX_OFFSET;
-    }
+  // Detectar si el plano auto-detectado es horizontal o vertical
+  if (!isCalibrated) {
+    isAutoHorizontal = Math.abs(gravity.z) > 0.75;
   }
 
-  // Comprobación de alineación (< 2.0 grados) y disparo de respuesta háptica
-  const currentlyAligned = calibratedGravity !== null && angleDeg < 2.0;
+  // Producto escalar para calcular la desviación en grados
+  const dot = curNorm.x * refNorm.x + curNorm.y * refNorm.y + curNorm.z * refNorm.z;
+  const clampedDot = Math.max(-1, Math.min(1, dot));
+  const angleRad = Math.acos(clampedDot);
+  angleDeg = angleRad * (180 / Math.PI);
+
+  // Construir base ortonormal para el plano
+  let tx = 1, ty = 0, tz = 0;
+  if (Math.abs(refNorm.x) > 0.9) {
+    tx = 0;
+    ty = 1;
+    tz = 0;
+  }
+
+  // u = refNorm x t
+  const ux = refNorm.y * tz - refNorm.z * ty;
+  const uy = refNorm.z * tx - refNorm.x * tz;
+  const uz = refNorm.x * ty - refNorm.y * tx;
+  const lenU = Math.sqrt(ux * ux + uy * uy + uz * uz);
+  const uNorm = { x: ux / lenU, y: uy / lenU, z: uz / lenU };
+
+  // v = refNorm x uNorm
+  const vx = refNorm.y * uNorm.z - refNorm.z * uNorm.y;
+  const vy = refNorm.z * uNorm.x - refNorm.x * uNorm.z;
+  const vz = refNorm.x * uNorm.y - refNorm.y * uNorm.x;
+
+  // Proyecciones
+  const pu = curNorm.x * uNorm.x + curNorm.y * uNorm.y + curNorm.z * uNorm.z;
+  const pv = curNorm.x * vx + curNorm.y * vy + curNorm.z * vz;
+
+  const MAX_ANGLE_LIMIT = 15;
+  const deviation = Math.min(1.0, angleDeg / MAX_ANGLE_LIMIT);
+  const lenProj = Math.sqrt(pu * pu + pv * pv);
+
+  if (lenProj > 0) {
+    // pv representa la desviación horizontal de la pantalla
+    // pu representa la desviación vertical (cabeceo)
+    bubbleX = -(pv / lenProj) * deviation * MAX_OFFSET;
+    bubbleY = -(pu / lenProj) * deviation * MAX_OFFSET;
+  }
+
+  // Comprobación de alineación (< 2.0 grados) y respuesta háptica
+  const currentlyAligned = angleDeg < 2.0;
   useEffect(() => {
-    if (calibratedGravity !== null) {
-      if (currentlyAligned !== isAligned) {
-        setIsAligned(currentlyAligned);
-        if (currentlyAligned) {
-          // Vibración mediana al alinearse perfectamente
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-        }
+    if (currentlyAligned !== isAligned) {
+      setIsAligned(currentlyAligned);
+      if (currentlyAligned) {
+        // Disparo táctil único al quedar alineado perfectamente
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       }
     }
-  }, [currentlyAligned, isAligned, calibratedGravity]);
+  }, [currentlyAligned, isAligned]);
 
-  // Calibrar plano de referencia
+  // Calibrar plano de referencia manual (tara)
   const handleCalibrate = () => {
     setCalibratedGravity({ ...gravity });
+    setIsCalibrated(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     useToastStore.getState().showToast(
-      'Superficie Calibrada',
-      'Plano de referencia guardado con éxito. Ahora encuadre la radiografía.',
+      'Plano Calibrado',
+      'Plano de referencia guardado. Mantenga la burbuja en el centro verde para tomar la foto.',
       'success'
+    );
+  };
+
+  // Restablecer a calibración automática
+  const handleResetCalibration = () => {
+    setCalibratedGravity(null);
+    setIsCalibrated(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    useToastStore.getState().showToast(
+      'Modo Automático',
+      'Se restableció el nivelador al plano automático (horizontal/vertical).',
+      'info'
     );
   };
 
@@ -187,7 +239,6 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
 
     try {
       setIsCapturing(true);
-      // Vibración de confirmación de captura
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
       const photo = await cameraRef.current.takePictureAsync({
@@ -197,13 +248,13 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
       if (photo && photo.uri) {
         onPhotoTaken(photo.uri);
       } else {
-        throw new Error('No se obtuvo la URI de la imagen.');
+        throw new Error('No se pudo capturar la imagen.');
       }
     } catch (error) {
-      console.error('[CameraLeveler] Error al capturar foto:', error);
+      console.error('[CameraLeveler] Error al capturar:', error);
       useToastStore.getState().showToast(
         'Error de captura',
-        'No se pudo tomar la foto. Por favor intente de nuevo.',
+        'No se pudo tomar la foto. Intente de nuevo.',
         'error'
       );
     } finally {
@@ -211,9 +262,29 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     }
   };
 
+  // Definir dimensiones dinámicas del marco de encuadre
+  // En horizontal usamos 4:3 (ancho > alto), en vertical 3:4 (alto > ancho)
+  const isLandscape = deviceOrientation !== 'PORTRAIT';
+  const maxFrameHeight = SCREEN_HEIGHT - 280;
+  const frameWidth = isLandscape
+    ? SCREEN_WIDTH - Spacing.lg * 2
+    : Math.min(SCREEN_WIDTH - Spacing.lg * 2, (maxFrameHeight * 3) / 4);
+  const frameHeight = isLandscape
+    ? (frameWidth * 3) / 4
+    : (frameWidth * 4) / 3;
+
+  // Animación de rotación de la UI
+  const rotation = rotateAnim.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-90deg', '0deg', '90deg'],
+  });
+
+  const animatedStyle = {
+    transform: [{ rotate: rotation }],
+  };
+
   if (!visible) return null;
 
-  // Renderizar pantalla de carga o error de permisos
   if (!permission) {
     return (
       <Modal visible={visible} animationType="fade" statusBarTranslucent>
@@ -250,48 +321,38 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     <Modal visible={visible} animationType="slide" statusBarTranslucent>
       <View style={styles.container}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="back" mode="picture">
-          {/* Capas negras de recorte para simular máscara 4:3 en el centro */}
+          {/* Capas oscuras de máscara de recorte */}
           <View style={styles.maskContainer}>
             {/* Superior */}
             <View style={styles.maskDark} />
 
-            <View style={styles.maskRow}>
+            <View style={[styles.maskRow, { height: frameHeight }]}>
               {/* Izquierda */}
               <View style={styles.maskDark} />
 
               {/* Recuadro de encuadre */}
-              <View style={styles.frameOutline}>
-                {/* Esquinas de diseño del marco */}
+              <View style={[styles.frameOutline, { width: frameWidth, height: frameHeight }]}>
+                {/* Esquinas cosméticas */}
                 <View style={[styles.corner, styles.cornerTL]} />
                 <View style={[styles.corner, styles.cornerTR]} />
                 <View style={[styles.corner, styles.cornerBL]} />
                 <View style={[styles.corner, styles.cornerBR]} />
 
-                {/* Burbuja niveladora flotante en el centro del marco */}
-                {calibratedGravity ? (
-                  <View style={styles.levelerContainer}>
-                    {/* Círculo Exterior (Nivel) */}
-                    <View style={[styles.levelOuter, currentlyAligned && styles.levelOuterAligned]}>
-                      {/* Ejes de mira (cruz) */}
-                      <View style={styles.levelCrosshairH} />
-                      <View style={styles.levelCrosshairV} />
-
-                      {/* Círculo Central (Target) */}
-                      <View style={[styles.levelInner, currentlyAligned && styles.levelInnerAligned]} />
-
-                      {/* Burbuja Móvil */}
-                      <View
-                        style={[
-                          styles.bubble,
-                          currentlyAligned ? styles.bubbleAligned : styles.bubbleMisaligned,
-                          {
-                            transform: [{ translateX: bubbleX }, { translateY: bubbleY }],
-                          },
-                        ]}
-                      />
-                    </View>
+                {/* Burbuja niveladora física en el centro */}
+                <View style={styles.levelerContainer}>
+                  <View style={[styles.levelOuter, currentlyAligned && styles.levelOuterAligned]}>
+                    <View style={styles.levelCrosshairH} />
+                    <View style={styles.levelCrosshairV} />
+                    <View style={[styles.levelInner, currentlyAligned && styles.levelInnerAligned]} />
+                    <View
+                      style={[
+                        styles.bubble,
+                        currentlyAligned ? styles.bubbleAligned : styles.bubbleMisaligned,
+                        { transform: [{ translateX: bubbleX }, { translateY: bubbleY }] },
+                      ]}
+                    />
                   </View>
-                ) : null}
+                </View>
               </View>
 
               {/* Derecha */}
@@ -299,70 +360,84 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
             </View>
 
             {/* Inferior */}
-            <View style={[styles.maskDark, { flex: 1.5 }]} />
+            <View style={[styles.maskDark, { flex: 1.4 }]} />
           </View>
 
           {/* Interfaz de Usuario Overlay */}
           <View style={styles.hudOverlay}>
             {/* Header */}
             <View style={styles.header}>
-              <TouchableOpacity onPress={onCancel} style={styles.closeBtn} activeOpacity={0.7}>
-                <Ionicons name="close" size={26} color="#FFF" />
-              </TouchableOpacity>
+              <Animated.View style={animatedStyle}>
+                <TouchableOpacity onPress={onCancel} style={styles.closeBtn} activeOpacity={0.7}>
+                  <Ionicons name="close" size={26} color="#FFF" />
+                </TouchableOpacity>
+              </Animated.View>
 
               {/* Badge del Estado de Calibración / Ángulo */}
-              <GlassContainer style={styles.statusBadge}>
-                {calibratedGravity ? (
+              <Animated.View style={animatedStyle}>
+                <GlassContainer style={styles.statusBadge}>
                   <View style={styles.badgeContent}>
-                    <View style={[styles.statusDot, currentlyAligned ? styles.dotGreen : styles.dotYellow]} />
+                    <View
+                      style={[
+                        styles.statusDot,
+                        isCalibrated
+                          ? currentlyAligned ? styles.dotGreen : styles.dotYellow
+                          : currentlyAligned ? styles.dotCyan : styles.dotYellow,
+                      ]}
+                    />
                     <Text style={styles.badgeText}>
-                      {currentlyAligned
-                        ? `Ángulo correcto: ${angleDeg.toFixed(1)}°`
-                        : `Desviación: ${angleDeg.toFixed(1)}°`}
+                      {isCalibrated
+                        ? `Calibrado: ${angleDeg.toFixed(1)}°`
+                        : `${isAutoHorizontal ? 'Auto Mesa' : 'Auto Pared'}: ${angleDeg.toFixed(1)}°`}
                     </Text>
                   </View>
-                ) : (
-                  <View style={styles.badgeContent}>
-                    <View style={[styles.statusDot, styles.dotRed]} />
-                    <Text style={styles.badgeText}>Sin calibrar plano</Text>
-                  </View>
-                )}
-              </GlassContainer>
+                </GlassContainer>
+              </Animated.View>
+
               <View style={{ width: 44 }} />
             </View>
 
             {/* Caja de instrucciones de apoyo */}
             <View style={styles.instructionContainer}>
-              <GlassContainer style={styles.instructionBox}>
-                <Text style={styles.instructionText}>
-                  {!calibratedGravity
-                    ? '1. Apoye el celular plano sobre la placa de rayos X y presione "Calibrar"'
-                    : currentlyAligned
-                    ? '✓ Teléfono alineado. ¡Tome la fotografía!'
-                    : '2. Enmarque la cadera y mueva el celular para centrar la burbuja (Verde)'}
-                </Text>
-              </GlassContainer>
+              <Animated.View style={[animatedStyle, { width: '90%' }]}>
+                <GlassContainer style={styles.instructionBox}>
+                  <Text style={styles.instructionText}>
+                    {!isCalibrated
+                      ? `Enmarque la placa ${isLandscape ? 'horizontal' : 'vertical'}. Mantenga la burbuja en el centro verde.`
+                      : currentlyAligned
+                      ? '✓ Teléfono alineado con la referencia. ¡Tome la foto!'
+                      : 'Mueva el celular para alinear la burbuja con el plano calibrado.'}
+                  </Text>
+                </GlassContainer>
+              </Animated.View>
             </View>
 
             {/* Panel de Controles Inferiores */}
             <View style={styles.bottomControls}>
-              {/* Botón de Calibrar a la izquierda */}
-              <TouchableOpacity
-                onPress={handleCalibrate}
-                style={[styles.actionBtn, calibratedGravity && styles.actionBtnActive]}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={calibratedGravity ? 'git-compare-outline' : 'locate-outline'}
-                  size={24}
-                  color={calibratedGravity ? Colors.primary : '#FFF'}
-                />
-                <Text style={[styles.actionBtnText, calibratedGravity && styles.actionBtnTextActive]}>
-                  {calibratedGravity ? 'Recalibrar' : 'Calibrar'}
-                </Text>
-              </TouchableOpacity>
+              {/* Botón de Calibración */}
+              <Animated.View style={animatedStyle}>
+                {isCalibrated ? (
+                  <TouchableOpacity
+                    onPress={handleResetCalibration}
+                    style={[styles.actionBtn, styles.actionBtnActive]}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="refresh-outline" size={22} color={Colors.primary} />
+                    <Text style={[styles.actionBtnText, styles.actionBtnTextActive]}>Auto</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={handleCalibrate}
+                    style={styles.actionBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="locate-outline" size={22} color="#FFF" />
+                    <Text style={styles.actionBtnText}>Calibrar</Text>
+                  </TouchableOpacity>
+                )}
+              </Animated.View>
 
-              {/* Botón de Shutter (Tomar Foto) */}
+              {/* Botón de Obturador */}
               <TouchableOpacity
                 onPress={handleTakePhoto}
                 disabled={isCapturing}
@@ -376,21 +451,34 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
                 <View style={[styles.shutterInner, currentlyAligned && styles.shutterInnerAligned]} />
               </TouchableOpacity>
 
-              {/* Botón de ayuda para guiar al médico */}
-              <View style={styles.helpPlaceholder}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={24}
-                  color="rgba(255,255,255,0.4)"
-                  onPress={() => {
-                    useToastStore.getState().showToast(
-                      'Instrucciones de Nivel',
-                      'Apoye el teléfono en la misma inclinación que el negatoscope, presione Calibrar, luego retírelo para tomar la foto manteniéndolo paralelo al plano calibrado.',
-                      'info'
-                    );
-                  }}
-                />
-              </View>
+              {/* Recalibrar o Info */}
+              <Animated.View style={animatedStyle}>
+                {isCalibrated ? (
+                  <TouchableOpacity
+                    onPress={handleCalibrate}
+                    style={styles.actionBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="locate-outline" size={22} color="#FFF" />
+                    <Text style={styles.actionBtnText}>Calibrar</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      useToastStore.getState().showToast(
+                        'Modo Automático Activo',
+                        'El nivelador detecta si la radiografía está vertical (pared) u horizontal (mesa). Si su negatoscopio está inclinado, presione "Calibrar" para fijar un plano personalizado.',
+                        'info'
+                      );
+                    }}
+                  >
+                    <Ionicons name="information-circle-outline" size={22} color="#FFF" />
+                    <Text style={styles.actionBtnText}>Ayuda</Text>
+                  </TouchableOpacity>
+                )}
+              </Animated.View>
             </View>
           </View>
         </CameraView>
@@ -437,7 +525,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.base,
     fontFamily: Typography.fonts.bold,
   },
-  // Máscara oscura para encuadrar la radiografía
   maskContainer: {
     position: 'absolute',
     top: 0,
@@ -450,22 +537,20 @@ const styles = StyleSheet.create({
   maskDark: {
     flex: 1,
     width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   maskRow: {
     flexDirection: 'row',
-    height: FRAME_HEIGHT,
+    width: '100%',
   },
   frameOutline: {
-    width: FRAME_WIDTH,
-    height: FRAME_HEIGHT,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.45)',
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
-  // Esquinas cosméticas de cámara
   corner: {
     position: 'absolute',
     width: 16,
@@ -496,7 +581,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
   },
-  // Burbuja y miras del nivelador
   levelerContainer: {
     position: 'absolute',
     justifyContent: 'center',
@@ -530,9 +614,9 @@ const styles = StyleSheet.create({
   },
   levelInner: {
     position: 'absolute',
-    width: TARGET_RADIUS * 2,
-    height: TARGET_RADIUS * 2,
-    borderRadius: TARGET_RADIUS,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     borderStyle: 'dashed',
@@ -564,7 +648,6 @@ const styles = StyleSheet.create({
   bubbleAligned: {
     backgroundColor: Colors.primary,
   },
-  // HUD UI Overlay
   hudOverlay: {
     position: 'absolute',
     top: 0,
@@ -611,6 +694,9 @@ const styles = StyleSheet.create({
   dotGreen: {
     backgroundColor: Colors.statusNormal,
   },
+  dotCyan: {
+    backgroundColor: Colors.primary,
+  },
   dotYellow: {
     backgroundColor: Colors.statusWarning,
   },
@@ -630,7 +716,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.md,
-    width: '100%',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
@@ -658,7 +743,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    width: 120,
+    width: 100,
+    height: 40,
     justifyContent: 'center',
   },
   actionBtnActive: {
@@ -712,10 +798,5 @@ const styles = StyleSheet.create({
   },
   shutterInnerAligned: {
     backgroundColor: Colors.primary,
-  },
-  helpPlaceholder: {
-    width: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
