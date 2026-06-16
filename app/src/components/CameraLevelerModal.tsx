@@ -44,9 +44,9 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   const smoothX = useRef(0);
   const smoothY = useRef(0);
   const smoothZ = useRef(-1);
-  const alpha = 0.12; // Un poco más de suavizado para una experiencia más premium
+  const alpha = 0.12;
 
-  // Estado para refrescar la UI con la gravedad
+  // Estado para refrescar la UI
   const [gravity, setGravity] = useState({ x: 0, y: 0, z: -1 });
 
   // Detección automática de orientación del dispositivo (PORTRAIT, LANDSCAPE_LEFT, LANDSCAPE_RIGHT)
@@ -84,7 +84,7 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
           z: smoothZ.current,
         });
 
-        // 2. Detección de orientación con histéresis (evita parpadeos en diagonales)
+        // 2. Detección de orientación con histéresis
         const ax = data.x;
         const ay = data.y;
         if (Math.abs(ax) > 0.65) {
@@ -123,7 +123,7 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
 
   // Función para obtener vector de gravedad ideal por defecto (Auto-calibración)
   const getDefaultReference = (x: number, y: number, z: number, orientation: 'PORTRAIT' | 'LANDSCAPE_LEFT' | 'LANDSCAPE_RIGHT') => {
-    // Si el teléfono está plano (en mesa / superficie horizontal, predomina z)
+    // Si el teléfono está plano en mesa (predomina z)
     if (Math.abs(z) > 0.75) {
       return { x: 0, y: 0, z: z > 0 ? 1 : -1 };
     }
@@ -133,7 +133,6 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     } else if (orientation === 'LANDSCAPE_LEFT') {
       return { x: x > 0 ? 1 : -1, y: 0, z: 0 };
     } else {
-      // LANDSCAPE_RIGHT
       return { x: x > 0 ? 1 : -1, y: 0, z: 0 };
     }
   };
@@ -156,9 +155,10 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     isAutoHorizontal = Math.abs(gravity.z) > 0.75;
   }
 
-  // Producto escalar para calcular la desviación en grados
-  const dot = curNorm.x * refNorm.x + curNorm.y * refNorm.y + curNorm.z * refNorm.z;
-  const clampedDot = Math.max(-1, Math.min(1, dot));
+  // Producto escalar para calcular la desviación en grados de paralelismo 3D
+  const dot = curNorm.x * refNorm.x + curNorm.y * refNorm.y + curNorm.z * curNorm.z; // corregido a curNorm.z * refNorm.z
+  const safeDot = curNorm.x * refNorm.x + curNorm.y * refNorm.y + curNorm.z * refNorm.z;
+  const clampedDot = Math.max(-1, Math.min(1, safeDot));
   const angleRad = Math.acos(clampedDot);
   angleDeg = angleRad * (180 / Math.PI);
 
@@ -191,17 +191,13 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   const lenProj = Math.sqrt(pu * pu + pv * pv);
 
   if (lenProj > 0) {
-    // pv representa la desviación horizontal de la pantalla
-    // pu representa la desviación vertical (cabeceo)
     const rawX = -(pv / lenProj) * deviation * MAX_OFFSET;
     const rawY = -(pu / lenProj) * deviation * MAX_OFFSET;
 
     if (deviceOrientation === 'LANDSCAPE_LEFT') {
-      // Rotación de 90 grados en sentido antihorario
       bubbleX = rawY;
       bubbleY = -rawX;
     } else if (deviceOrientation === 'LANDSCAPE_RIGHT') {
-      // Rotación de 90 grados en sentido horario
       bubbleX = -rawY;
       bubbleY = rawX;
     } else {
@@ -210,17 +206,36 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     }
   }
 
-  // Comprobación de alineación (< 2.0 grados) y respuesta háptica
+  // CALCULO DE GIRO LATERAL (ROLL) RESPECTO A LA GRAVEDAD ABSOLUTA
+  // Solo se calcula cuando el celular está vertical (modo pared). Si está plano en mesa, no aplica rotación lateral.
+  const isFlat = Math.abs(gravity.z) > 0.75;
+  let rollAngle = 0;
+  if (!isFlat) {
+    if (deviceOrientation === 'PORTRAIT') {
+      rollAngle = Math.atan2(gravity.x, -gravity.y) * (180 / Math.PI);
+    } else if (deviceOrientation === 'LANDSCAPE_LEFT') {
+      rollAngle = Math.atan2(gravity.y, gravity.x) * (180 / Math.PI);
+    } else if (deviceOrientation === 'LANDSCAPE_RIGHT') {
+      rollAngle = Math.atan2(-gravity.y, -gravity.x) * (180 / Math.PI);
+    }
+  }
+
+  // Comprobación de alineación de ambos ejes:
+  // 1. Paralelismo a la radiografía (< 2.0 grados)
+  // 2. Nivelación lateral / roll (< 1.5 grados, o plano en mesa)
   const currentlyAligned = angleDeg < 2.0;
+  const currentlyLeveled = isFlat || Math.abs(rollAngle) < 1.5;
+  const isAlignedBoth = currentlyAligned && currentlyLeveled;
+
   useEffect(() => {
-    if (currentlyAligned !== isAligned) {
-      setIsAligned(currentlyAligned);
-      if (currentlyAligned) {
-        // Disparo táctil único al quedar alineado perfectamente
+    if (isAlignedBoth !== isAligned) {
+      setIsAligned(isAlignedBoth);
+      if (isAlignedBoth) {
+        // Haptic de alineación total
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       }
     }
-  }, [currentlyAligned, isAligned]);
+  }, [isAlignedBoth, isAligned]);
 
   // Calibrar plano de referencia manual (tara)
   const handleCalibrate = () => {
@@ -229,7 +244,7 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     useToastStore.getState().showToast(
       'Plano Calibrado',
-      'Plano de referencia guardado. Mantenga la burbuja en el centro verde para tomar la foto.',
+      'Plano de referencia guardado. Mantenga el celular paralelo y nivelado para tomar la foto.',
       'success'
     );
   };
@@ -276,7 +291,6 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   };
 
   // Definir dimensiones dinámicas del marco de encuadre
-  // En horizontal usamos 4:3 (ancho > alto), en vertical 3:4 (alto > ancho)
   const isLandscape = deviceOrientation !== 'PORTRAIT';
   const maxFrameHeight = SCREEN_HEIGHT - 280;
   const frameWidth = isLandscape
@@ -351,16 +365,33 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
                 <View style={[styles.corner, styles.cornerBL]} />
                 <View style={[styles.corner, styles.cornerBR]} />
 
+                {/* Indicador de horizonte lateral (DSLR style) para evitar fotos torcidas */}
+                {!isFlat && (
+                  <View
+                    style={[
+                      styles.horizonContainer,
+                      {
+                        width: frameWidth,
+                        transform: [{ rotate: `${-rollAngle}deg` }],
+                      },
+                    ]}
+                  >
+                    <View style={[styles.horizonLine, currentlyLeveled && styles.horizonLineLeveled]} />
+                    <View style={{ width: LEVEL_RADIUS * 2 + 20 }} />
+                    <View style={[styles.horizonLine, currentlyLeveled && styles.horizonLineLeveled]} />
+                  </View>
+                )}
+
                 {/* Burbuja niveladora física en el centro */}
                 <View style={styles.levelerContainer}>
-                  <View style={[styles.levelOuter, currentlyAligned && styles.levelOuterAligned]}>
+                  <View style={[styles.levelOuter, isAlignedBoth && styles.levelOuterAligned]}>
                     <View style={styles.levelCrosshairH} />
                     <View style={styles.levelCrosshairV} />
-                    <View style={[styles.levelInner, currentlyAligned && styles.levelInnerAligned]} />
+                    <View style={[styles.levelInner, isAlignedBoth && styles.levelInnerAligned]} />
                     <View
                       style={[
                         styles.bubble,
-                        currentlyAligned ? styles.bubbleAligned : styles.bubbleMisaligned,
+                        isAlignedBoth ? styles.bubbleAligned : styles.bubbleMisaligned,
                         { transform: [{ translateX: bubbleX }, { translateY: bubbleY }] },
                       ]}
                     />
@@ -393,15 +424,16 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
                     <View
                       style={[
                         styles.statusDot,
-                        isCalibrated
-                          ? currentlyAligned ? styles.dotGreen : styles.dotYellow
-                          : currentlyAligned ? styles.dotCyan : styles.dotYellow,
+                        isAlignedBoth
+                          ? isCalibrated ? styles.dotGreen : styles.dotCyan
+                          : styles.dotYellow,
                       ]}
                     />
                     <Text style={styles.badgeText}>
                       {isCalibrated
                         ? `Calibrado: ${angleDeg.toFixed(1)}°`
                         : `${isAutoHorizontal ? 'Auto Mesa' : 'Auto Pared'}: ${angleDeg.toFixed(1)}°`}
+                      {!isFlat && Math.abs(rollAngle) >= 1.5 && ` | Giro: ${rollAngle > 0 ? '+' : ''}${rollAngle.toFixed(1)}°`}
                     </Text>
                   </View>
                 </GlassContainer>
@@ -415,11 +447,11 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
               <Animated.View style={[animatedStyle, { width: '90%' }]}>
                 <GlassContainer style={styles.instructionBox}>
                   <Text style={styles.instructionText}>
-                    {!isCalibrated
-                      ? `Enmarque la placa ${isLandscape ? 'horizontal' : 'vertical'}. Mantenga la burbuja en el centro verde.`
-                      : currentlyAligned
-                      ? '✓ Teléfono alineado con la referencia. ¡Tome la foto!'
-                      : 'Mueva el celular para alinear la burbuja con el plano calibrado.'}
+                    {isAlignedBoth
+                      ? '✓ Celular alineado y nivelado. ¡Tome la foto!'
+                      : !currentlyAligned
+                      ? 'Incline el celular para centrar la burbuja (Alinear profundidad)'
+                      : 'Gire el celular lateralmente para alinear la línea de horizonte (Nivelar giro)'}
                   </Text>
                 </GlassContainer>
               </Animated.View>
@@ -456,12 +488,12 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
                 disabled={isCapturing}
                 style={[
                   styles.shutterBtn,
-                  currentlyAligned && styles.shutterBtnAligned,
+                  isAlignedBoth && styles.shutterBtnAligned,
                   isCapturing && { opacity: 0.5 },
                 ]}
                 activeOpacity={0.8}
               >
-                <View style={[styles.shutterInner, currentlyAligned && styles.shutterInnerAligned]} />
+                <View style={[styles.shutterInner, isAlignedBoth && styles.shutterInnerAligned]} />
               </TouchableOpacity>
 
               {/* Recalibrar o Info */}
@@ -481,8 +513,8 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
                     activeOpacity={0.7}
                     onPress={() => {
                       useToastStore.getState().showToast(
-                        'Modo Automático Activo',
-                        'El nivelador detecta si la radiografía está vertical (pared) u horizontal (mesa). Si su negatoscopio está inclinado, presione "Calibrar" para fijar un plano personalizado.',
+                        'Doble Nivelador Activo',
+                        'Burbuja: Alinea la profundidad paralela a la placa.\nLíneas laterales: Nivelan el giro (roll) para evitar que la foto salga chueca hacia los lados.',
                         'info'
                       );
                     }}
@@ -593,6 +625,33 @@ const styles = StyleSheet.create({
     right: -1,
     borderBottomWidth: 3,
     borderRightWidth: 3,
+  },
+  // Indicador de horizonte DSLR
+  horizonContainer: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  horizonLine: {
+    height: 1.5,
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  horizonLineLeveled: {
+    backgroundColor: Colors.primary,
+    height: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 5,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   levelerContainer: {
     position: 'absolute',
