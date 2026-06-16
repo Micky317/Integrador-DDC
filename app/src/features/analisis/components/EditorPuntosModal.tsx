@@ -8,9 +8,11 @@ const getFriendlyLabel = (label: string) => {
     case 'KP_0': return 'Techo Der. (Rx Izq.)';
     case 'KP_1': return 'Cartílago Y Der.';
     case 'KP_2': return 'Cabeza Femoral Der.';
-    case 'KP_3': return 'Cabeza Femoral Izq.';
+    case 'KP_3': return 'Cuello Femoral Der.';
     case 'KP_4': return 'Techo Izq. (Rx Der.)';
     case 'KP_5': return 'Cartílago Y Izq.';
+    case 'KP_6': return 'Cabeza Femoral Izq.';
+    case 'KP_7': return 'Cuello Femoral Izq.';
     default: return label.replace('KP_', 'Punto ');
   }
 };
