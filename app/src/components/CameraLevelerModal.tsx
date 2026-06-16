@@ -193,8 +193,21 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   if (lenProj > 0) {
     // pv representa la desviación horizontal de la pantalla
     // pu representa la desviación vertical (cabeceo)
-    bubbleX = -(pv / lenProj) * deviation * MAX_OFFSET;
-    bubbleY = -(pu / lenProj) * deviation * MAX_OFFSET;
+    const rawX = -(pv / lenProj) * deviation * MAX_OFFSET;
+    const rawY = -(pu / lenProj) * deviation * MAX_OFFSET;
+
+    if (deviceOrientation === 'LANDSCAPE_LEFT') {
+      // Rotación de 90 grados en sentido antihorario
+      bubbleX = rawY;
+      bubbleY = -rawX;
+    } else if (deviceOrientation === 'LANDSCAPE_RIGHT') {
+      // Rotación de 90 grados en sentido horario
+      bubbleX = -rawY;
+      bubbleY = rawX;
+    } else {
+      bubbleX = rawX;
+      bubbleY = rawY;
+    }
   }
 
   // Comprobación de alineación (< 2.0 grados) y respuesta háptica
@@ -276,7 +289,7 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   // Animación de rotación de la UI
   const rotation = rotateAnim.interpolate({
     inputRange: [-1, 0, 1],
-    outputRange: ['-90deg', '0deg', '90deg'],
+    outputRange: ['90deg', '0deg', '-90deg'],
   });
 
   const animatedStyle = {
