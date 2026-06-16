@@ -84,13 +84,20 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
           z: smoothZ.current,
         });
 
-        // 2. Detección de orientación con histéresis
+        // 2. Detección de orientación con histéresis adaptable (también para modo Mesa)
         const ax = data.x;
         const ay = data.y;
-        if (Math.abs(ax) > 0.65) {
+        const az = data.z;
+
+        // Si el teléfono está apuntando hacia abajo (mesa), los valores de x e y son muy pequeños.
+        // Reducimos el umbral a 0.08 para detectar giros horizontales sobre la mesa.
+        const isFlatDetect = Math.abs(az) > 0.75;
+        const threshold = isFlatDetect ? 0.08 : 0.55;
+
+        if (Math.abs(ax) > threshold && Math.abs(ax) > Math.abs(ay)) {
           const targetOri = ax > 0 ? 'LANDSCAPE_LEFT' : 'LANDSCAPE_RIGHT';
           setDeviceOrientation((prev) => (prev !== targetOri ? targetOri : prev));
-        } else if (Math.abs(ay) > 0.65) {
+        } else if (Math.abs(ay) > threshold && Math.abs(ay) >= Math.abs(ax)) {
           setDeviceOrientation((prev) => (prev !== 'PORTRAIT' ? 'PORTRAIT' : prev));
         }
       });
@@ -156,7 +163,6 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   }
 
   // Producto escalar para calcular la desviación en grados de paralelismo 3D
-  const dot = curNorm.x * refNorm.x + curNorm.y * refNorm.y + curNorm.z * curNorm.z; // corregido a curNorm.z * refNorm.z
   const safeDot = curNorm.x * refNorm.x + curNorm.y * refNorm.y + curNorm.z * refNorm.z;
   const clampedDot = Math.max(-1, Math.min(1, safeDot));
   const angleRad = Math.acos(clampedDot);
@@ -207,7 +213,6 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
   }
 
   // CALCULO DE GIRO LATERAL (ROLL) RESPECTO A LA GRAVEDAD ABSOLUTA
-  // Solo se calcula cuando el celular está vertical (modo pared). Si está plano en mesa, no aplica rotación lateral.
   const isFlat = Math.abs(gravity.z) > 0.75;
   let rollAngle = 0;
   if (!isFlat) {
@@ -220,9 +225,7 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     }
   }
 
-  // Comprobación de alineación de ambos ejes:
-  // 1. Paralelismo a la radiografía (< 2.0 grados)
-  // 2. Nivelación lateral / roll (< 1.5 grados, o plano en mesa)
+  // Comprobación de alineación de ambos ejes
   const currentlyAligned = angleDeg < 2.0;
   const currentlyLeveled = isFlat || Math.abs(rollAngle) < 1.5;
   const isAlignedBoth = currentlyAligned && currentlyLeveled;
@@ -231,7 +234,6 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     if (isAlignedBoth !== isAligned) {
       setIsAligned(isAlignedBoth);
       if (isAlignedBoth) {
-        // Haptic de alineación total
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       }
     }
@@ -365,7 +367,7 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
                 <View style={[styles.corner, styles.cornerBL]} />
                 <View style={[styles.corner, styles.cornerBR]} />
 
-                {/* Indicador de horizonte lateral (DSLR style) para evitar fotos torcidas */}
+                {/* Indicador de horizonte lateral (DSLR style) */}
                 {!isFlat && (
                   <View
                     style={[
@@ -442,88 +444,86 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
               <View style={{ width: 44 }} />
             </View>
 
-            {/* Caja de instrucciones de apoyo */}
-            <View style={styles.instructionContainer}>
-              <Animated.View style={[animatedStyle, { width: '90%' }]}>
-                <GlassContainer style={styles.instructionBox}>
-                  <Text style={styles.instructionText}>
-                    {isAlignedBoth
-                      ? '✓ Celular alineado y nivelado. ¡Tome la foto!'
-                      : !currentlyAligned
-                      ? 'Incline el celular para centrar la burbuja (Alinear profundidad)'
-                      : 'Gire el celular lateralmente para alinear la línea de horizonte (Nivelar giro)'}
-                  </Text>
-                </GlassContainer>
-              </Animated.View>
-            </View>
-
-            {/* Panel de Controles Inferiores */}
-            <View style={styles.bottomControls}>
-              {/* Botón de Calibración */}
-              <Animated.View style={animatedStyle}>
-                {isCalibrated ? (
-                  <TouchableOpacity
-                    onPress={handleResetCalibration}
-                    style={[styles.actionBtn, styles.actionBtnActive]}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="refresh-outline" size={22} color={Colors.primary} />
-                    <Text style={[styles.actionBtnText, styles.actionBtnTextActive]}>Auto</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={handleCalibrate}
-                    style={styles.actionBtn}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="locate-outline" size={22} color="#FFF" />
-                    <Text style={styles.actionBtnText}>Calibrar</Text>
-                  </TouchableOpacity>
-                )}
+            {/* Panel de Controles Inferiores y Texto de Instrucción Integrado */}
+            <View style={styles.bottomContainer}>
+              {/* Instrucción limpia y compacta (fuera de la pantalla de la radiografía) */}
+              <Animated.View style={[animatedStyle, styles.instructionWrapper]}>
+                <Text style={styles.instructionText}>
+                  {isAlignedBoth
+                    ? '✓ Teléfono alineado. ¡Tome la foto!'
+                    : !currentlyAligned
+                    ? 'Incline el celular para centrar la burbuja'
+                    : 'Gire el celular lateralmente para nivelar el horizonte'}
+                </Text>
               </Animated.View>
 
-              {/* Botón de Obturador */}
-              <TouchableOpacity
-                onPress={handleTakePhoto}
-                disabled={isCapturing}
-                style={[
-                  styles.shutterBtn,
-                  isAlignedBoth && styles.shutterBtnAligned,
-                  isCapturing && { opacity: 0.5 },
-                ]}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.shutterInner, isAlignedBoth && styles.shutterInnerAligned]} />
-              </TouchableOpacity>
+              <View style={styles.bottomControls}>
+                {/* Botón de Calibración */}
+                <Animated.View style={animatedStyle}>
+                  {isCalibrated ? (
+                    <TouchableOpacity
+                      onPress={handleResetCalibration}
+                      style={[styles.actionBtn, styles.actionBtnActive]}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="refresh-outline" size={22} color={Colors.primary} />
+                      <Text style={[styles.actionBtnText, styles.actionBtnTextActive]}>Auto</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={handleCalibrate}
+                      style={styles.actionBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="locate-outline" size={22} color="#FFF" />
+                      <Text style={styles.actionBtnText}>Calibrar</Text>
+                    </TouchableOpacity>
+                  )}
+                </Animated.View>
 
-              {/* Recalibrar o Info */}
-              <Animated.View style={animatedStyle}>
-                {isCalibrated ? (
-                  <TouchableOpacity
-                    onPress={handleCalibrate}
-                    style={styles.actionBtn}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="locate-outline" size={22} color="#FFF" />
-                    <Text style={styles.actionBtnText}>Calibrar</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.actionBtn}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      useToastStore.getState().showToast(
-                        'Doble Nivelador Activo',
-                        'Burbuja: Alinea la profundidad paralela a la placa.\nLíneas laterales: Nivelan el giro (roll) para evitar que la foto salga chueca hacia los lados.',
-                        'info'
-                      );
-                    }}
-                  >
-                    <Ionicons name="information-circle-outline" size={22} color="#FFF" />
-                    <Text style={styles.actionBtnText}>Ayuda</Text>
-                  </TouchableOpacity>
-                )}
-              </Animated.View>
+                {/* Botón de Obturador */}
+                <TouchableOpacity
+                  onPress={handleTakePhoto}
+                  disabled={isCapturing}
+                  style={[
+                    styles.shutterBtn,
+                    isAlignedBoth && styles.shutterBtnAligned,
+                    isCapturing && { opacity: 0.5 },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.shutterInner, isAlignedBoth && styles.shutterInnerAligned]} />
+                </TouchableOpacity>
+
+                {/* Recalibrar o Info */}
+                <Animated.View style={animatedStyle}>
+                  {isCalibrated ? (
+                    <TouchableOpacity
+                      onPress={handleCalibrate}
+                      style={styles.actionBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="locate-outline" size={22} color="#FFF" />
+                      <Text style={styles.actionBtnText}>Calibrar</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        useToastStore.getState().showToast(
+                          'Doble Nivelador Activo',
+                          'Burbuja: Alinea la profundidad paralela a la placa.\nLíneas laterales: Nivelan el giro (roll) para evitar que la foto salga chueca hacia los lados.',
+                          'info'
+                        );
+                      }}
+                    >
+                      <Ionicons name="information-circle-outline" size={22} color="#FFF" />
+                      <Text style={styles.actionBtnText}>Ayuda</Text>
+                    </TouchableOpacity>
+                  )}
+                </Animated.View>
+              </View>
             </View>
           </View>
         </CameraView>
@@ -626,7 +626,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
   },
-  // Indicador de horizonte DSLR
   horizonContainer: {
     position: 'absolute',
     flexDirection: 'row',
@@ -780,28 +779,30 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     fontFamily: Typography.fonts.semibold,
   },
-  instructionContainer: {
-    paddingHorizontal: Spacing.lg,
+  bottomContainer: {
+    width: '100%',
     alignItems: 'center',
   },
-  instructionBox: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+  instructionWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
   instructionText: {
     color: '#FFF',
-    fontSize: Typography.size.sm,
-    fontFamily: Typography.fonts.medium,
+    fontSize: Typography.size.base - 1,
+    fontFamily: Typography.fonts.semibold,
     textAlign: 'center',
-    lineHeight: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 3,
+    paddingHorizontal: Spacing.md,
   },
   bottomControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
     paddingHorizontal: Spacing.xl,
     paddingBottom: Platform.OS === 'ios' ? 10 : 20,
   },
