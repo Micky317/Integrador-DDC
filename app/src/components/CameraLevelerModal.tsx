@@ -221,6 +221,16 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
     }
   }
 
+  // COMBINACIÓN DE LA ROTACIÓN DE LA PANTALLA Y EL GIRO FÍSICO
+  // screenAngle representa la rotación base en grados de las líneas para mantenerse horizontal al usuario
+  let screenAngle = 0;
+  if (deviceOrientation === 'LANDSCAPE_LEFT') {
+    screenAngle = -90;
+  } else if (deviceOrientation === 'LANDSCAPE_RIGHT') {
+    screenAngle = 90;
+  }
+  const horizonRotation = screenAngle - rollAngle;
+
   // Comprobación de alineación de ambos ejes
   const currentlyAligned = angleDeg < 2.0;
   const currentlyLeveled = isFlat || Math.abs(rollAngle) < 1.5;
@@ -343,7 +353,7 @@ export const CameraLevelerModal: React.FC<CameraLevelerModalProps> = ({
               style={[
                 styles.horizonContainer,
                 {
-                  transform: [{ rotate: `${-rollAngle}deg` }],
+                  transform: [{ rotate: `${horizonRotation}deg` }],
                 },
               ]}
             >
