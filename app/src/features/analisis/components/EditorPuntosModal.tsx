@@ -3,6 +3,18 @@ import { View, Text, Modal, ScrollView, Image, TouchableOpacity, PanResponder, A
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const getFriendlyLabel = (label: string) => {
+  switch (label) {
+    case 'KP_0': return 'Techo Der. (Rx Izq.)';
+    case 'KP_1': return 'Cartílago Y Der.';
+    case 'KP_2': return 'Cabeza Femoral Der.';
+    case 'KP_3': return 'Cabeza Femoral Izq.';
+    case 'KP_4': return 'Techo Izq. (Rx Der.)';
+    case 'KP_5': return 'Cartílago Y Izq.';
+    default: return label.replace('KP_', 'Punto ');
+  }
+};
+
 const DraggablePoint = ({ point, originalSize, containerSize, onUpdate, zoomScale, scrollRef }: any) => {
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   
@@ -94,8 +106,8 @@ const DraggablePoint = ({ point, originalSize, containerSize, onUpdate, zoomScal
           {...panResponder.panHandlers}
       >
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFF' }} />
-          <Text style={{ position: 'absolute', top: -20, color: '#00FFCC', fontSize: 10, fontWeight: 'bold', width: 90, textAlign: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, overflow: 'hidden' }}>
-              {point.label}
+          <Text style={{ position: 'absolute', top: -20, color: '#00FFCC', fontSize: 10, fontWeight: 'bold', width: 120, textAlign: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, overflow: 'hidden' }}>
+              {getFriendlyLabel(point.label)}
           </Text>
       </Animated.View>
   );
