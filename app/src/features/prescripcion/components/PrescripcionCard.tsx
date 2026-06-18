@@ -18,12 +18,14 @@ interface PrescripcionCardProps {
   prescripcion: PrescripcionMedica;
   paciente?: Paciente;
   analisis?: Analisis | null;
+  isMedico?: boolean;
 }
 
 export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
   prescripcion,
   paciente,
   analisis,
+  isMedico = false,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -161,32 +163,34 @@ export const PrescripcionCard: React.FC<PrescripcionCardProps> = ({
           )}
 
           {/* Botones de Compartir PDF y WhatsApp */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.pdfButton}
-              onPress={handleSharePDF}
-              disabled={generatingPdf}
-              activeOpacity={0.7}
-            >
-              {generatingPdf ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <>
-                  <Ionicons name="document-text-outline" size={15} color="#FFF" />
-                  <Text style={styles.pdfButtonText} numberOfLines={1}>Compartir PDF</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          {isMedico && (
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={styles.pdfButton}
+                onPress={handleSharePDF}
+                disabled={generatingPdf}
+                activeOpacity={0.7}
+              >
+                {generatingPdf ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name="document-text-outline" size={15} color="#FFF" />
+                    <Text style={styles.pdfButtonText} numberOfLines={1}>Compartir PDF</Text>
+                  </>
+                )}
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.whatsappButton}
-              onPress={handleWhatsAppPrescripcionShare}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="logo-whatsapp" size={15} color="#FFF" />
-              <Text style={styles.whatsappButtonText} numberOfLines={1}>Enviar WhatsApp</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={styles.whatsappButton}
+                onPress={handleWhatsAppPrescripcionShare}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="logo-whatsapp" size={15} color="#FFF" />
+                <Text style={styles.whatsappButtonText} numberOfLines={1}>Enviar WhatsApp</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
     </GlassContainer>

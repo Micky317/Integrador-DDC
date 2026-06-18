@@ -52,6 +52,277 @@ function App() {
   const [prescripcionesLoading, setPrescripcionesLoading] = useState(false)
   const [prescripcionesFilterMedico, setPrescripcionesFilterMedico] = useState('todos')
 
+  // --- Estado: Detalles del Dashboard de Paciente ---
+  const [selectedPatientData, setSelectedPatientData] = useState(null)
+  const [patientAnalisisCount, setPatientAnalisisCount] = useState(0)
+  const [patientPrescripcionesCount, setPatientPrescripcionesCount] = useState(0)
+  const [patientCitas, setPatientCitas] = useState([])
+  const [isDashboardDetailsLoading, setIsDashboardDetailsLoading] = useState(false)
+
+  const calcularEdadMeses = (fechaNacimiento) => {
+    if (!fechaNacimiento) return ''
+    const hoy = new Date()
+    const nac = new Date(fechaNacimiento)
+    let meses = (hoy.getFullYear() - nac.getFullYear()) * 12 + hoy.getMonth() - nac.getMonth()
+    if (hoy.getDate() < nac.getDate()) {
+      meses--
+    }
+    if (meses < 0) return '0 meses'
+    const años = Math.floor(meses / 12)
+    const restoMeses = meses % 12
+    if (años > 0) {
+      return `${años} año(s) ${restoMeses} mes(es)`
+    }
+    return `${meses} mes(es)`
+  }
+
+  const loadPatientDashboardDetails = async (patientId) => {
+    if (!patientId) {
+      setSelectedPatientData(null)
+      setPatientAnalisisCount(0)
+      setPatientPrescripcionesCount(0)
+      setPatientCitas([])
+      return
+    }
+    setIsDashboardDetailsLoading(true)
+    
+    // 1. Encontrar localmente si ya tenemos los datos completos del paciente
+    let patientData = null
+    if (userProfile?.rol === 'admin') {
+      patientData = adminPatients.find(p => p.id === patientId)
+    } else {
+      patientData = patients.find(p => p.id === patientId)
+    }
+
+    if (patientData) {
+      setSelectedPatientData(patientData)
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from('pacientes')
+          .select('*')
+          .eq('id', patientId)
+          .single()
+        if (!error && data) {
+          setSelectedPatientData(data)
+        }
+      } catch (e) {
+        console.error("Error fetching patient row:", e)
+      }
+    }
+
+    // 2. Conteo de análisis (radiografías)
+    try {
+      const { count, error } = await supabase
+        .from('analisis')
+        .select('id', { count: 'exact', head: true })
+        .eq('paciente_id', patientId)
+      if (!error) {
+        setPatientAnalisisCount(count || 0)
+      }
+    } catch (e) {
+      console.error("Error fetching analisis count:", e)
+    }
+
+    // 3. Conteo de prescripciones de ejercicios
+    try {
+      const { count, error } = await supabase
+        .from('prescripciones_ejercicios')
+        .select('id', { count: 'exact', head: true })
+        .eq('paciente_id', patientId)
+      if (!error) {
+        setPatientPrescripcionesCount(count || 0)
+      }
+    } catch (e) {
+      console.error("Error fetching exercises count:", e)
+    }
+
+    // 4. Historial de citas (recordatorios tipo 'cita')
+    try {
+      const { data, error } = await supabase
+        .from('recordatorios')
+        .select('*')
+        .eq('paciente_id', patientId)
+        .eq('tipo', 'cita')
+        .order('fecha_programada', { ascending: false })
+      if (!error) {
+        setPatientCitas(data || [])
+      } else {
+        setPatientCitas([])
+      }
+    } catch (e) {
+      console.error("Error fetching recordatorios:", e)
+      setPatientCitas([])
+    } finally {
+      setIsDashboardDetailsLoading(false)
+    }
+  }
+
+  const renderPatientDashboard = (patientData) => {
+    if (!patientData) return null
+
+    return (
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 mb-8">
+        
+        {/* Banner de Cabecera con Degradado Moderno */}
+        <div className="bg-gradient-to-r from-primary-600 via-primary-500 to-sky-400 p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+          {/* Círculos de fondo decorativos para efecto visual premium */}
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
+          <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
+
+          <div className="flex flex-col md:flex-row items-center gap-4 relative z-10">
+            {/* Avatar del Paciente con Iniciales */}
+            <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center font-bold text-2xl ring-4 ring-white/20 shadow-inner">
+              {patientData.nombre_completo ? patientData.nombre_completo.charAt(0) : 'P'}
+            </div>
+            <div className="text-center md:text-left">
+              <h3 className="text-2xl font-bold tracking-tight">{patientData.nombre_completo}</h3>
+              <p className="text-xs text-white/85 mt-1 flex items-center justify-center md:justify-start gap-2">
+                <span>Paciente Pediátrico</span>
+                <span className="w-1.5 h-1.5 bg-white/50 rounded-full"></span>
+                <span>{calcularEdadMeses(patientData.fecha_nacimiento)}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 relative z-10">
+            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${patientData.sexo === 'F' ? 'bg-pink-500/20 text-pink-100 border border-pink-400/30' : 'bg-blue-500/20 text-blue-100 border border-blue-400/30'}`}>
+              {patientData.sexo === 'F' ? '♀ Femenino' : '♂ Masculino'}
+            </span>
+            <span className="bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/20 text-xs font-mono font-bold tracking-wider">
+              {patientData.codigo_paciente || 'SIN CÓDIGO'}
+            </span>
+          </div>
+        </div>
+
+        {/* Sección de Datos y Timeline */}
+        <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-50/30">
+          
+          {/* Card 1: Ficha Demográfica */}
+          <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-100 hover:border-primary-100 hover:shadow-sm transition-all duration-300">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+              <Baby className="text-primary-500" size={16} />
+              Datos del Paciente
+            </h4>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-medium">Fecha de Nacimiento</span>
+                <span className="text-xs font-bold text-slate-700">{patientData.fecha_nacimiento}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-medium">Edad Cronológica</span>
+                <span className="text-xs font-bold text-slate-700">{calcularEdadMeses(patientData.fecha_nacimiento)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-medium">Edad Gestacional</span>
+                <span className="text-xs font-bold text-slate-700">
+                  {patientData.edad_gestacional ? `${patientData.edad_gestacional} semanas` : 'No registrada'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-medium">Médico Responsable</span>
+                <span className="text-xs font-bold text-primary-600 bg-primary-50 px-2.5 py-0.5 rounded-full">
+                  {userProfile?.rol === 'medico' ? userProfile.nombre_completo : (doctors.find(d => d.id === selectedDoctor)?.nombre_completo || 'Asignado')}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Tutor y Antecedentes */}
+          <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-100 hover:border-primary-100 hover:shadow-sm transition-all duration-300 flex flex-col justify-between">
+            <div>
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                <Shield className="text-primary-500" size={16} />
+                Contacto y Diagnóstico
+              </h4>
+              
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tutor a Cargo (Padre)</p>
+                  <p className="text-sm font-semibold text-slate-800">{patientData.nombre_tutor || 'No registrado'}</p>
+                  {patientData.telefono_contacto && (
+                    <p className="text-xs text-slate-500 font-mono mt-0.5 flex items-center gap-1">
+                      <span>📞</span> {patientData.telefono_contacto}
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Factores de Riesgo</p>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Presentación Pélvica (Nalgas)</span>
+                      <span className={`w-2.5 h-2.5 rounded-full ${patientData.presentacion_nalgas ? 'bg-orange-500 animate-pulse' : 'bg-slate-300'}`} title={patientData.presentacion_nalgas ? 'Sí' : 'No'}></span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Antecedentes Familiares</span>
+                      <span className={`w-2.5 h-2.5 rounded-full ${patientData.antecedente_familiar ? 'bg-purple-500 animate-pulse' : 'bg-slate-300'}`} title={patientData.antecedente_familiar ? 'Sí' : 'No'}></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 mt-4">
+              <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-100">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Placas de RX</p>
+                <p className="text-lg font-extrabold text-primary-600 mt-0.5">{patientAnalisisCount}</p>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-100">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Ejercicios Activos</p>
+                <p className="text-lg font-extrabold text-medical-accent mt-0.5">{patientPrescripcionesCount}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Timeline de Citas */}
+          <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-100 hover:border-primary-100 hover:shadow-sm transition-all duration-300">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+              <FileText className="text-primary-500" size={16} />
+              Citas y Revisiones
+            </h4>
+            
+            <div className="overflow-y-auto max-h-[190px] pr-1 relative pl-4">
+              {/* Línea vertical de la línea de tiempo */}
+              {patientCitas.length > 0 && (
+                <div className="absolute left-1.5 top-2 bottom-2 w-0.5 bg-slate-100"></div>
+              )}
+              
+              <div className="space-y-4">
+                {patientCitas.length > 0 ? (
+                  patientCitas.map((cita) => (
+                    <div key={cita.id} className="relative">
+                      {/* Nodo circular del timeline */}
+                      <div className={`absolute -left-[19.5px] top-1.5 w-3 h-3 rounded-full border-2 border-white ${cita.completado ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}></div>
+                      
+                      <div className="bg-slate-50/60 p-2.5 rounded-xl border border-slate-100/70 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase ${cita.completado ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {cita.completado ? 'Hecha' : 'Pendiente'}
+                          </span>
+                          <span className="text-[9px] font-mono text-slate-400">
+                            {new Date(cita.fecha_programada).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 mt-1.5 leading-snug">{cita.mensaje}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-xs text-slate-400 italic">No hay citas registradas.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    )
+  }
+
   const handleSyncData = async () => {
     setIsSyncing(true)
     try {
@@ -225,6 +496,18 @@ function App() {
     }
   }, [activeTab])
 
+  useEffect(() => {
+    if (userProfile?.rol === 'medico' && selectedPatient) {
+      loadPatientDashboardDetails(selectedPatient)
+    }
+  }, [selectedPatient, userProfile, patients])
+
+  useEffect(() => {
+    if (userProfile?.rol === 'admin' && selectedAdminPatient) {
+      loadPatientDashboardDetails(selectedAdminPatient)
+    }
+  }, [selectedAdminPatient, userProfile, adminPatients])
+
   const fetchUserProfile = async (userId) => {
     try {
       setIsLoading(true)
@@ -254,7 +537,7 @@ function App() {
     try {
       const { data, error } = await supabase
         .from('pacientes')
-        .select('id, nombre_completo')
+        .select('*')
         .order('nombre_completo')
       
       if (error) throw error
@@ -731,6 +1014,8 @@ function App() {
                     </div>
                   </header>
 
+                  {selectedAdminPatient && selectedPatientData && renderPatientDashboard(selectedPatientData)}
+
                   <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold text-slate-700 flex items-center gap-2">
@@ -1040,7 +1325,7 @@ function App() {
               </div>
               <form onSubmit={handleSavePatient} className="px-8 pb-8 pt-4 space-y-4 overflow-y-auto">
 
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">👶 Datos del Bebé</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">👶 Datos del Paciente</p>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
@@ -1301,6 +1586,8 @@ function App() {
                     <h3 className="text-3xl font-bold text-medical-accent">+0.4°</h3>
                   </div>
                 </div>
+
+                {selectedPatient && selectedPatientData && renderPatientDashboard(selectedPatientData)}
 
                 <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
                   <div className="flex items-center justify-between mb-4">
