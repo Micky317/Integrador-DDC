@@ -1,8 +1,6 @@
 # 🚀 Guía de Preparación para la Presentación (DDC Pasitos Firmes)
 
-Sigue estos pasos mañana antes de mostrarle el proyecto a tu docente para asegurar que el celular y la computadora se conecten correctamente.
 
----
 
 ## 1. Obtener tu nueva IP Local 📋
 Al conectarte a la red de la universidad, tu computadora tendrá una IP distinta.
@@ -55,10 +53,4 @@ sudo ufw status
 
 ---
 
-## 5. Lista de Verificación Final (Checklist) ✅
-- [ ] Tu laptop y tu celular están en la **misma red Wi-Fi**.
-- [ ] El backend está corriendo y dice: `Application startup complete`.
-- [ ] Has escaneado el QR de Expo con la app **Expo Go** en el celular.
-- [ ] Al subir una foto, la terminal del backend muestra: `POST /analyze`.
 
-**¡Mucho éxito en tu presentación mañana! Todo va a salir excelente. 👶🩺🦾**
