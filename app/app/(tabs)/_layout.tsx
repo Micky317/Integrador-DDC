@@ -104,6 +104,14 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="rehabilitacion"
+        options={{
+          title: 'Rehabilitación',
+          href: !isMedico ? '/rehabilitacion' : null,
+          tabBarIcon: ({ focused }) => <TabIcon name="fitness" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="configuracion"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="settings" focused={focused} />,
